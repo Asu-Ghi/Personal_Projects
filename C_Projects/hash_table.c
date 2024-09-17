@@ -13,6 +13,9 @@ typedef struct {
 	int age;
 } person;
 
+
+person * hash_table[TABLE_SIZE];
+
 unsigned int hash(char* name) {
 	int length = strnlen(name, MAX_NAME);
 	unsigned int hash_value = 0;
@@ -26,11 +29,78 @@ unsigned int hash(char* name) {
 	return hash_value;
 }
 
+void init_hash_table(){
+
+	for (int i = 0; i < TABLE_SIZE; i++) {
+		hash_table[i] = NULL;
+	}
+	// table is empty
+}
+
+void print_table() {
+	printf("Start \n");
+	for (int i = 0; i < TABLE_SIZE; i++) {;
+		if (hash_table[i] == NULL) {
+			printf("\t%i\t ---\n", i);
+		}
+
+		else {
+			printf("\t%i\t%s\n", i, hash_table[i]->name);				
+		}
+	}	
+	printf("End \n");
+}
+
+bool insert_hash_table(person* p) {
+	if (p == NULL) return false;
+	
+	int index = hash(p->name);
+	
+	if (hash_table[index] != NULL) {
+		return false;	
+	}
+	
+	hash_table[index] = p;
+	return true;
+}
+
+// Find a person by their name
+person *hash_table_lookup(char *name ) {
+	int index = hash(name);
+	if (hash_table[index] != NULL &&
+		strncmp(hash_table[index]->name, name, TABLE_SIZE) == 0) {
+		return hash_table[index];
+	} else {
+		return NULL;
+	}
+}
+
+person *hash_table_delete(char *name) {
+	return NULL;
+}
+
 int main() {
-     printf("Jacob => %u\n", hash("Jacob")); 
-     printf("Natalie => %u\n", hash("Natalie")); 
-     printf("Mark => %u\n", hash("Mark")); 
-     printf("John => %u\n", hash("John")); 
+     init_hash_table();
+     print_table();
+     person jacob = {.name="Jacob", .age=17};
+     person natalie = {.name="Natalie", .age=20};
+     person mpho = {.name="mpho", .age=200 };
+     person mark = {.name="mark", .age= 21};
+
+     insert_hash_table(&jacob);
+     insert_hash_table(&natalie);
+     insert_hash_table(&mpho);
+     insert_hash_table(&mark);
+     person *temp = hash_table_lookup("mpho");
+
+     if (temp == NULL) {
+	printf("Person not found! \n");
+	
+     } else {
+	printf("Found %s \n ", temp->name);
+     }
+	 
+     print_table();
      return 0;
 }
 
