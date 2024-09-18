@@ -68,7 +68,7 @@ bool insert_hash_table(person* p) {
 person *hash_table_lookup(char *name ) {
 	int index = hash(name);
 	if (hash_table[index] != NULL &&
-		strncmp(hash_table[index]->name, name, TABLE_SIZE) == 0) {
+		strncmp(hash_table[index]->name, name, MAX_NAME) == 0) {
 		return hash_table[index];
 	} else {
 		return NULL;
@@ -76,6 +76,13 @@ person *hash_table_lookup(char *name ) {
 }
 
 person *hash_table_delete(char *name) {
+	int index = hash(name);
+	if (hash_table[index] != NULL &&
+	    strncmp(hash_table[index] -> name, name, MAX_NAME) == 0) {
+		person *tmp = hash_table[index];
+		hash_table[index] = NULL;
+		return tmp;
+	}
 	return NULL;
 }
 
@@ -99,10 +106,25 @@ int main() {
      } else {
 	printf("Found %s \n ", temp->name);
      }
-	 
+		 
      print_table();
+     printf("Testing Delete\n");
+
+     hash_table_delete("mpho");
+     temp = hash_table_lookup("mpho");
+     
+     if (temp == NULL) {
+	printf("Person not found! \n");
+     } else {
+	printf("Found %s \n ", temp->name);
+     }
+
+     print_table();
+
      return 0;
+ 
 }
+
 
 
 
