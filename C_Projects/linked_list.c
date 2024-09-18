@@ -30,10 +30,10 @@ int main(int argc, char** argv) {
     if (head == NULL) {
         return 1;
     }
-    
+
     head -> val = 1;
     head-> next = (node_t *) malloc(sizeof(node_t));
-    head -> next -> val = 2
+    head -> next -> val = 2;
 
     print_list(head);
     return 0;
