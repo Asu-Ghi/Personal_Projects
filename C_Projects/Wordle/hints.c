@@ -16,7 +16,7 @@ void create_alphabet_table(letter* letter_table[]) {
     int indx = 0;
     // append letter_table with letters a - z
     for (int i = 97; i < 123; i++) {
-        letter* temp = (letter*) malloc(sizeof(letter*));
+        letter* temp = (letter*) malloc(sizeof(letter)); 
         temp -> value = (char)i;
         temp -> count = 0;
         temp -> count_allowed =0;
@@ -97,13 +97,16 @@ int main(int argc, char** argv) {
     // create hint array size length
     char green_hints[length];
     char yellow_hints[length];
-    char red_hints[length];
     char big_hints[length];
+
     // fill hints with placeholder
     memset(green_hints, '-', length);
+    green_hints[length] = '\0'; 
     memset(yellow_hints, '-', length);
-    memset(red_hints, '-', length);
+    yellow_hints[length] = '\0'; 
     memset(big_hints, '-', length);
+    big_hints[length] = '\0'; 
+
 
     // get max letter counts possible for word_one, and update the table.
     get_counts(table, word_one);
@@ -131,9 +134,13 @@ int main(int argc, char** argv) {
         }
     }
 
+    // free up letter table
+    for (int i =0; i < 26; i ++) {
+        free(table[i]);
+    }
+
     // append all hints together.
     for(int i =0; i < length; i++) {
-
         if(green_hints[i] != '-') {
             big_hints[i] = green_hints[i];
         } 
@@ -147,7 +154,6 @@ int main(int argc, char** argv) {
     // print hints
     printf("Green hints: %s\n", green_hints);
     printf("Yellow hints: %s\n", yellow_hints);
-    printf("Red hints: %s\n", red_hints);
     printf("Big hints: %s\n", big_hints);
 
 
