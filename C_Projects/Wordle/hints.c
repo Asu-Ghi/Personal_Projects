@@ -17,8 +17,6 @@ void create_alphabet_table(letter* letter_table[]) {
     // append letter_table with letters a - z
     for (int i = 97; i < 123; i++) {
         letter* temp = (letter*) malloc(sizeof(letter));
-        letter* temp = (letter*) malloc(sizeof(letter));
-        letter* temp = (letter*) malloc(sizeof(letter)); 
         temp -> value = (char)i;
         temp -> count = 0;
         temp -> count_allowed =0;
@@ -38,7 +36,6 @@ letter* lookup_alphabet_table(letter* letter_table[], char letter) {
 
     return NULL; //couldnt find letter in table
 }
-
 //debuging method
 void print_alphabet_table (letter* letter_table[]) {
     // print out letter table
