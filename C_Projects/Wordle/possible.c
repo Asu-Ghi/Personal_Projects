@@ -91,7 +91,7 @@ void print_data(words* data, int length) {
 // create hints
 char* create_hints(char* word_one, char* word_two) {
     // create letter table -> tracks count and max possible count of each letter in a word.
-    letter* table[27];
+    letter* table[26];
     // create and print table for all letter values
     create_alphabet_table(table);
 
@@ -99,23 +99,20 @@ char* create_hints(char* word_one, char* word_two) {
     // create hint array size length
     char green_hints[length];
     char yellow_hints[length];
-    char big_hints[length];
 
     // fill hints with placeholder
     memset(green_hints, '-', length);
     green_hints[length] = '\0'; 
     memset(yellow_hints, '-', length);
     yellow_hints[length] = '\0'; 
-    memset(big_hints, '-', length);
-    big_hints[length] = '\0'; 
-
+ 
     // get max letter counts possible for word_one, and update the table.
     get_counts(table, word_one);
 
     // evaluate green hints first.
     get_green(table, word_one, word_two, green_hints);
 
-// evaluate yellow and then red hints.
+// evaluate yellow hints.
     for (int i = 0; i < length; i++) {
         for (int j = 0; j < length; j++) {
 
@@ -140,20 +137,20 @@ char* create_hints(char* word_one, char* word_two) {
         free(table[i]);
     }
 
-    // append all hints together.
-    for(int i =0; i < length; i++) {
-        if(green_hints[i] != '-') {
-            big_hints[i] = green_hints[i];
-        } 
-        else if(yellow_hints[i] != '-') {
-            big_hints[i] = yellow_hints[i];
-        }
-        else {
-            big_hints[i] = 'r';
+    // Allocate memory for final hints and copy content
+    char* final_hints = (char*)malloc((length + 1) * sizeof(char)); // +1 for null terminator
+    for (int i = 0; i < length; i++) {
+        if (green_hints[i] != '-') {
+            final_hints[i] = green_hints[i];
+        } else if (yellow_hints[i] != '-') {
+            final_hints[i] = yellow_hints[i];
+        } else {
+            // if not yellow or green -> is red
+            final_hints[i] = 'r';
         }
     }
-    char* final_hints = (char*)malloc(100 * sizeof(char)); // Allocate memory on the heap
-    final_hints = big_hints;
+    final_hints[length] = '\0';
+
     return final_hints;
 }
 
@@ -168,25 +165,35 @@ int main(int argc, char** argv) {
     char* word_one = argv[1];
     char* valid_hints = argv[2];
 
+    if (strlen(word_one) != strlen(valid_hints)) {
+        printf("Word and hints of not correct length.\n");
+        return 1;
+    }
+
     // read in data set
     int data_length = 2309;
     words data_set[data_length];    
     read_data(data_set, data_length);
     // print_data(data_set, data_length);
-    int indicies[100] = {0}; 
-    int in_count = 0;
+
+    // bool flag
+    bool noWords = true;
+    // calculate hints for all data
     for(int i =0 ; i < data_length; i++) {
-        char * test_hints = create_hints(word_one, data_set[i].val);
+        char * test_hints = create_hints(data_set[i].val, word_one);
         if (strcmp(test_hints, valid_hints) == 0) {
-            printf("%s\n", data_set[i].val);
+            printf("%s ", data_set[i].val);
+            noWords = false;
         }
     }
+    
+    // if no words 
+    if (noWords) {
+        printf("No possible hidden words found. \n");
+    }
 
+    // start new line
+    printf("\n");
 
-
-
-
-
-
-
+    return 0;
 }
