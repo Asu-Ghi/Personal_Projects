@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
             // check to see if a letter is in the word, but not the right spot. 
             // check table to see if letter has repeat apperances.
             // check to see if spot already taken by a green hint.
-            // incriment hash table for letter if both conditions are passed.
+            // incriment table for letter if both conditions are passed.
             if (word_one[i] == word_two[j] && 
             temp->count_allowed > temp->count &&
             green_hints[j] == '-') {
