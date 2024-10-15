@@ -38,6 +38,11 @@ dist_info calc_cost_sq(double* data, int center_indx, int len, int dim, int k) {
             distances[j].indx = j;
         }
 
+        // print all distances
+        for (int j = 0; j < len; j++) {
+            printf("Row: %d, Dist: %lf\n", distances[j].indx, distances[j].dist);
+        }
+
         // find min diff for each ci
         dist_info min_info = {-1, DBL_MAX};
 
@@ -47,7 +52,7 @@ dist_info calc_cost_sq(double* data, int center_indx, int len, int dim, int k) {
                 continue;
             }
 
-            if (distances[j] < min_info.dist) {
+            if (distances[j].dist < min_info.dist) {
                 min_info.indx = distances[j].indx;
                 min_info.dist = distances[j].dist;
             }
@@ -66,6 +71,8 @@ dist_info calc_cost_sq(double* data, int center_indx, int len, int dim, int k) {
 
         // assign next center
         center_indx = max_info.indx;
+        printf("Center at K = %d, With a cost of %lf.\n" , i, max_info.dist);
+        printf("Index of (%d)\n", max_info.indx);
     }
 
     free(minimums);
@@ -101,7 +108,6 @@ int main(int argc, char** argv) {
     int center_indx = 10;
 
     dist_info centers = calc_cost_sq(data, center_indx, len, dim, k);
-
     return 0;
 
 }
