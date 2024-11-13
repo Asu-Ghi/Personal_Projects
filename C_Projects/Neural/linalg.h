@@ -2,11 +2,25 @@
 #ifndef LINALG_H
 #define LINALG_H
 
+/*
+matrix data structure 
+holds dimensional data
+holds data as a pointer to a 1d double array
+used to store outputs and inputs.
+*/
+typedef struct {
+    double* data;
+    int dim1;
+    int dim2;
+} matrix;
+
 void scalar_mult(double* w, double scalar, int dim);
+
+matrix* transpose_matrix(matrix* w); 
 
 void print_matrix(double* M, int dim1, int dim2);
 
-double* matrix_mult(double* inputs, double* weights, int num_inputs, int num_neurons);
+double* matrix_mult(double* w, double* v, int rows_w, int cols_w, int cols_v);
 
 double dot_product(double* w, double* v, int dim);
 
