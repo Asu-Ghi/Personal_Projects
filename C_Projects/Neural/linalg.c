@@ -1,3 +1,4 @@
+#include "linalg.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,16 +12,60 @@ void scalar_mult(double* w, double scalar, int dim) {
     }
 }
 
-// (m x p) * (p x n) = (m x n)
-double* matrix_mult(double* inputs, double* weights, int num_inputs, int num_neurons) {
-    double* result = (double*)calloc(num_neurons, sizeof(double));
-    for (int i = 0; i < num_neurons; i++) {
-        for (int j = 0; j < num_inputs; j++) {
-            result[i] += inputs[j] * weights[i * num_inputs + j];
+// (rows_w x cols_w) * (rows_v x cols_v) = (rows_w x cols_v)
+double* matrix_mult(double* w, double* v, int rows_w, int cols_w, int cols_v) {
+    // Allocate result matrix with dimensions rows_w x cols_v
+    double* result = (double*)calloc(rows_w * cols_v, sizeof(double));
+    if (result == NULL) {
+        fprintf(stderr, "Error: Memory allocation failure in matrix_mult.\n");
+        exit(1);
+    }
+
+    // Perform the matrix multiplication
+    for (int i = 0; i < rows_w; i++) { // For each row in the result
+        for (int j = 0; j < cols_v; j++) { // For each column in the result
+            for (int k = 0; k < cols_w; k++) { // Shared dimension
+                result[i * cols_v + j] += w[i * cols_w + k] * v[k * cols_v + j];
+            }
         }
     }
+
     return result;
 }
+
+matrix* transpose_matrix(matrix* w){
+    // Create a new matrix object to hold the transposed matrix
+    matrix* transposed_matrix = (matrix*) malloc(sizeof(matrix));
+
+    // Check memory allocation for the matrix struct
+    if (transposed_matrix == NULL) {
+        fprintf(stderr, "Error: Memory allocation failure for transposed_matrix struct.\n");
+        exit(1);
+    }
+
+    // Allocate memory for the transposed data
+    transposed_matrix->dim1 = w->dim2;  // Transposed matrix rows = original matrix cols
+    transposed_matrix->dim2 = w->dim1;  // Transposed matrix cols = original matrix rows
+    transposed_matrix->data = (double*) calloc(transposed_matrix->dim1 * transposed_matrix->dim2, sizeof(double));
+
+    // Check memory allocation for the transposed data
+    if (transposed_matrix->data == NULL) {
+        fprintf(stderr, "Error: Memory allocation failure for transposed matrix data.\n");
+        exit(1);
+    }
+
+    // Iterate through the original matrix and fill the transposed matrix
+    for (int i = 0; i < w->dim1; i++) {
+        for (int j = 0; j < w->dim2; j++) {
+            // Swap row and column indices to transpose the matrix
+            transposed_matrix->data[j * w->dim1 + i] = w->data[i * w->dim2 + j];
+        }
+    }
+
+    // Return the pointer to the transposed matrix
+    return transposed_matrix;
+}
+
 
 // print matrix
 void print_matrix(double* M, int dim1, int dim2) {
