@@ -20,7 +20,7 @@ matrix* transpose_matrix(matrix* w);
 
 void print_matrix(double* M, int dim1, int dim2);
 
-double* matrix_mult(double* w, double* v, int rows_w, int cols_w, int cols_v);
+matrix* matrix_mult(matrix* w, matrix* v);
 
 double dot_product(double* w, double* v, int dim);
 

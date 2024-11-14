@@ -13,10 +13,26 @@ void scalar_mult(double* w, double scalar, int dim) {
 }
 
 // (rows_w x cols_w) * (rows_v x cols_v) = (rows_w x cols_v)
-double* matrix_mult(double* w, double* v, int rows_w, int cols_w, int cols_v) {
+matrix* matrix_mult(matrix* w, matrix* v) {
+    // Get dimensionality info
+    int rows_w = w->dim1;
+    int cols_w = w->dim2;
+    int cols_v = v->dim2;
+
+    // Check dimensions
+    if (w->dim2 != v->dim1) {
+        fprintf(stderr, "Error in matrix mult, dimensionality mismatch.\n");
+        exit(1);
+    }
+
     // Allocate result matrix with dimensions rows_w x cols_v
-    double* result = (double*)calloc(rows_w * cols_v, sizeof(double));
-    if (result == NULL) {
+    matrix* result = malloc(sizeof(matrix));
+    result->dim1 = rows_w;
+    result->dim2 = cols_v;
+    result->data = (double*) calloc(rows_w * cols_v, sizeof(double));
+    
+    // Check memory allocation
+    if (result->data == NULL) {
         fprintf(stderr, "Error: Memory allocation failure in matrix_mult.\n");
         exit(1);
     }
@@ -25,7 +41,7 @@ double* matrix_mult(double* w, double* v, int rows_w, int cols_w, int cols_v) {
     for (int i = 0; i < rows_w; i++) { // For each row in the result
         for (int j = 0; j < cols_v; j++) { // For each column in the result
             for (int k = 0; k < cols_w; k++) { // Shared dimension
-                result[i * cols_v + j] += w[i * cols_w + k] * v[k * cols_v + j];
+                result->data[i * cols_v + j] += w->data[i * cols_w + k] * v->data[k * cols_v + j];
             }
         }
     }
