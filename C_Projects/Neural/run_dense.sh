@@ -1,1 +1,1 @@
-gcc -g -fsanitize=address -o program program.c
+gcc -g -fsanitize=address -o dense dense.c linalg.c
