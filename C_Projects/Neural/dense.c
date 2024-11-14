@@ -26,7 +26,8 @@ typedef struct {
     matrix* weights;
     matrix* biases;
     matrix* inputs;
-    matrix* output;
+    matrix* pre_activation_output;
+    matrix* post_activation_output;
     matrix* dweights;
     matrix* dbiases;
     matrix* dinputs;
@@ -54,18 +55,29 @@ void forward_reLu(matrix* batch_input) {
 Takes in gradients from layer ahead and inputs from the layer before to calculate 
 gradients to send backwards to step before.
 */
-void backward_reLu(matrix* input_transposed, matrix* input_gradients) {
-    // Compute gradient of the loss with respect to the input
+void backward_reLu(matrix* inputs, matrix* input_gradients, matrix* output) {
 
-    // Loop over the input_gradients matrix (not transposed)
-    for (int i = 0; i < input_gradients->dim1 * input_gradients->dim2; i++) {
+    // check dimensions
+    if(inputs->dim2 != input_gradients->dim1) {
+        fprintf(stderr, "Error, mismatch in dimensions in backwards ReLu.\n");
+        exit(1);
+    }
+
+    // Loop over the input_transposed matrix 
+    // calculate the derivatives of each output of ReLu
+    // 1 if > 0, 0 otherwise.
+    for (int i = 0; i < inputs->dim1 * inputs->dim2; i++) {
         // Use the transposed input matrix to apply the ReLU derivative
-        if (input_transposed->data[i] <= 0) {
-            input_gradients->data[i] = 0;
-        } else {
-            input_gradients->data[i] = 1;
+        if (inputs->data[i] > 0) {
+            inputs->data[i] = 1;
+        } 
+        else {
+            inputs->data[i] = 0;
         }
     }
+
+    // matrix multiply inputs and input_gradients
+    output->data = matrix_mult(inputs->data, input_gradients->data, inputs->dim1, inputs->dim2, input_gradients->dim2);
 }
 
 
@@ -170,6 +182,7 @@ layer_dense init_layer(int num_inputs, int num_neurons, ActivationType activatio
     layer_.biases->data = (double*)calloc(num_neurons, sizeof(double));
     layer_.biases->dim1 = 1;
     layer_.biases->dim2 = num_neurons;
+
 
     // check if memory for matrix object was allocated.
     if (layer_.weights == NULL || layer_.biases == NULL) {
@@ -415,40 +428,53 @@ Returns a matrix object with output data and dimensional data for the outputs to
 matrix forward_pass(matrix* inputs, layer_dense* layer) {
 
     // create output struct
-    matrix output;
-    output.dim1 = inputs->dim1; // number of vectors in batch
-    output.dim2 = layer->weights->dim2; // number of neurons in weights
-    output.data = (double*) calloc(output.dim1  * output.dim2, sizeof(double));
-    if (output.data == NULL) {
+    matrix* output = malloc(sizeof(matrix));
+    output->dim1 = inputs->dim1; // number of vectors in batch
+    output->dim2 = layer->weights->dim2; // number of neurons in weights
+    output->data = (double*) calloc(output->dim1  * output->dim2, sizeof(double));
+    if (output->data == NULL) {
         fprintf(stderr, "Error in matrix mult for forward pass.\n");
         exit(1); 
     }
-
+    // num_inputs x num_neurons
     // Perform matrix multiplication between inputs (dim1 x dim2) and weights (dim2 x dim3)
+    // returns batch_size x num_neuron matrix for the layer
     double* multiplied_data = matrix_mult(inputs->data, layer->weights->data,
                                           inputs->dim1, inputs->dim2, layer->weights->dim2);
 
+    // check if matrix mult worked.
     if (multiplied_data == NULL) {
         fprintf(stderr, "Error in matrix multiplication for forward pass.\n");
-        free(output.data);
+        free(output->data);
         exit(1);
     }
 
-    // Add biases to the output data
-    for (int i = 0; i < output.dim1; i++) {
-        for (int j = 0; j < output.dim2; j++) {
-            output.data[i * output.dim2 + j] = multiplied_data[i * output.dim2 + j] + layer->biases->data[j];
+    // Add biases for the layer to the batch output data
+    // batch_size x num_neurons, where output dim1 -> batch size
+    for (int i = 0; i < output->dim1; i++) {
+        // output dim2-> num neurons
+        for (int j = 0; j < output->dim2; j++) {
+            output->data[i * output->dim2 + j] = multiplied_data[i * output->dim2 + j] + layer->biases->data[j];
         }
     }
 
+    // Allocate memory for pre activation outputs
+    layer->pre_activation_output = malloc(sizeof(matrix));
+    layer->pre_activation_output->dim1 = output->dim1;
+    layer->pre_activation_output->dim2 = output->dim2;
+    layer->pre_activation_output->data = (double*) calloc(output->dim1  * output->dim2, sizeof(double));
+    // Update pre activation outputs
+    memcpy(layer->pre_activation_output->data,  output->data, output->dim1 * output->dim2 * sizeof(double));
+
+    // modifies output 
     // relu activation
     if (layer->activation == RELU) {
-        forward_reLu(&output);
+        forward_reLu(output);
     } 
 
     // softmax activation
     else if(layer->activation == SOFTMAX) {
-        forward_softMax(&output);
+        forward_softMax(output);
     }
 
     else {
@@ -456,8 +482,15 @@ matrix forward_pass(matrix* inputs, layer_dense* layer) {
         exit(1);
     }
 
-    // returns input batch after forward pass 
-    return(output);
+    // Allocate memory for pre activation outputs
+    layer->post_activation_output = malloc(sizeof(matrix));
+    layer->post_activation_output->dim1 = output->dim1;
+    layer->post_activation_output->dim2 = output->dim2;
+    layer->post_activation_output->data = (double*) calloc(output->dim1  * output->dim2, sizeof(double));
+
+    // Update post activation outputs
+    memcpy(layer->post_activation_output->data,  output->data, output->dim1 * output->dim2 * sizeof(double));
+    return *output;
 }
 
 
@@ -468,12 +501,14 @@ Returns a matrix of gradients to be used in the layer before, and later for opti
 Stores this matrix of gradients in the layer dense data structure to be used later
 */
 matrix backward_pass(matrix* input_gradients, layer_dense* layer, matrix* inputs) {
+
     // Print debug info
     printf("---------LAYER %s---------\n", layer->id);
     printf("----Inputs---\n");
     print_matrix(inputs->data, inputs->dim1, inputs->dim2);
     printf("----Input Gradients---\n");
     print_matrix(input_gradients->data, input_gradients->dim1, input_gradients->dim2);
+
 
     // Check if activation function is softmax
     if (layer->activation == SOFTMAX) {
@@ -485,28 +520,53 @@ matrix backward_pass(matrix* input_gradients, layer_dense* layer, matrix* inputs
     // Initialize gradients for weights, biases, and inputs
     matrix dweights, dbiases, dinputs;
 
-    // Apply activation function gradient (backprop through ReLU or others)
+    // Create a transposed object of inputs.
     matrix* inputs_transposed = transpose_matrix(inputs);
+
+    // Apply activation function gradient (backprop through ReLU or others)
+
+   // Initialize output matrix for activation function backwards pass.
+    matrix activation_outputs;
+    activation_outputs.data = (double*) calloc(inputs_transposed->dim1 * input_gradients->dim2, sizeof(double));
+    activation_outputs.dim1 = inputs_transposed->dim1;
+    activation_outputs.dim2 = input_gradients->dim2;
+    if (activation_outputs.data == NULL) {
+        fprintf(stderr, "Error: Memory allocation failure in backwards ReLu function. \n");
+        exit(1);
+    }
+
     if (layer->activation == RELU) {
-        backward_reLu(inputs_transposed, input_gradients);  // ReLU backward pass
-        printf("--------RELU INPUT GRADIENTS-------\n");
-        print_matrix(input_gradients->data, input_gradients->dim1, input_gradients->dim2);
+        // returns batch_size x neurons matrix
+         backward_reLu(inputs_transposed, input_gradients, &activation_outputs);  // ReLU backward pass
+        
+        // debugging
+        printf("--------Derivative ReLU------------\n");
+        print_matrix(activation_outputs.data, activation_outputs.dim1, activation_outputs.dim2);
     }
 
     // Continue with weight and bias gradient calculations...
 
     // Example for weight gradient computation (dW = X^T * delta):
-    dweights.data = matrix_mult(inputs_transposed->data, input_gradients->data, 
-                                 inputs_transposed->dim1, inputs_transposed->dim2, input_gradients->dim2);
     dweights.dim1 = inputs_transposed->dim1;  // Number of input features
-    dweights.dim2 = input_gradients->dim2;  // Number of neurons in the current layer
+    dweights.dim2 = activation_outputs.dim2;  // Number of neurons in the current layer
+    
+    printf("%d x %d\n", inputs_transposed->dim1, inputs_transposed->dim2);
+    printf("%d x %d\n", activation_outputs.dim1, activation_outputs.dim2);
+
+    dweights.data = matrix_mult(inputs->data, activation_outputs.data, 
+                                 inputs->dim1, inputs->dim2, activation_outputs.dim2);  
+                                       
+    printf("--------Derivative Weights------------\n");
+    print_matrix(dweights.data, dweights.dim1, dweights.dim2);
+
+
 
     // Sum gradients for biases (db = sum(delta)):
     dbiases.dim1 = 1;  // 1 row, sum of biases across all examples
-    dbiases.dim2 = input_gradients->dim2;  // Number of neurons
+    dbiases.dim2 = activation_outputs.dim2;  // Number of neurons
     dbiases.data = (double*)calloc(dbiases.dim2, sizeof(double));
     
-    for (int i = 0; i < input_gradients->dim2; i++) {  // Loop over the neurons
+    for (int i = 0; i < activation_outputs.dim2; i++) {  // Loop over the neurons
         for (int j = 0; j < input_gradients->dim1; j++) {  // Loop over the examples
             dbiases.data[i] += input_gradients->data[j * input_gradients->dim2 + i];
         }
@@ -514,8 +574,6 @@ matrix backward_pass(matrix* input_gradients, layer_dense* layer, matrix* inputs
 
     // Gradient for inputs (dX = delta * W^T):
     matrix* weights_transposed = transpose_matrix(layer->weights);
-    printf("----------Layer WEIGHTS--------\n");
-    print_matrix(weights_transposed->data, weights_transposed->dim1, weights_transposed->dim2);
     dinputs.data = matrix_mult(input_gradients->data, weights_transposed->data, 
                                input_gradients->dim1, input_gradients->dim2, weights_transposed->dim2);
     dinputs.dim1 = input_gradients->dim1;  // Number of examples
