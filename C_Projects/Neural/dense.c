@@ -141,7 +141,7 @@ Backwards softmax and categorical loss entropy function
 returns computed gradients to propogate backwards
 input is the already calculated softmax outputs and true labels (one hot or sparse).
 */
-matrix backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
+matrix* backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
 
     // Check dimensionality
     if (layer->post_activation_output->dim1 != true_labels->dim1 || layer->post_activation_output->dim2 != true_labels->dim2) {
@@ -251,7 +251,7 @@ matrix backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
     printf("-------SOFTMAX GRADIENTS------\n");
     print_matrix(output_gradients->data, output_gradients->dim1, output_gradients->dim2);
 
-    return *output_gradients;
+    return output_gradients;
 }
 
 
@@ -613,7 +613,7 @@ Takes in an input of gradients from layer ahead, and inputs (outputs from layer 
 Returns a matrix of gradients to be used in the layer before, and later for optimization.
 Stores this matrix of gradients in the layer dense data structure to be used later
 */
-matrix backward_pass(matrix* input_gradients, layer_dense* layer, matrix* inputs, matrix* y_true) {
+matrix* backward_pass(matrix* input_gradients, layer_dense* layer, matrix* inputs, matrix* y_true) {
 
     // Print debug info
     printf("---------LAYER %s---------\n", layer->id);
@@ -629,7 +629,7 @@ matrix backward_pass(matrix* input_gradients, layer_dense* layer, matrix* inputs
     }
 
     // Initialize gradients for weights, biases, and inputs
-    matrix* dweights, dbiases, dinputs;
+    matrix* dinputs = malloc(sizeof(matrix));
 
     // Create a transposed object of inputs.
     matrix* inputs_transposed = transpose_matrix(inputs);
@@ -668,6 +668,9 @@ void free_layer(layer_dense* layer) {
     free(layer->dbiases);
     free(layer->dinputs->data);
     free(layer->dinputs);
+    free(layer->pre_activation_output);
+    free(layer->post_activation_output);
+
 }
 
 /*
@@ -786,32 +789,15 @@ int main(int argc, char** argv) {
 
     // Step 2: Compute gradients 
 
-    matrix grad_layer3 = backward_pass(&input_gradients, &layer_4, &softmax_output, &one_hot_vector);  // Backpropagate from softmax to layer 3
-    printf("grad_layer3 dim: %d x %d\n", grad_layer3.dim1, grad_layer3.dim2);
+    /*
+    FIX THIS MEMORY OVERFLOW -> SOME BS STORE EVERYTHING IN THE STRUCT FROM NOW ON.
+    */
+    matrix* grad_layer3 = backward_pass(&input_gradients, &layer_4, &softmax_output, &one_hot_vector);  // Backpropagate from softmax to layer 3
+    printf("grad_layer3 dim: %d x %d\n", grad_layer3->dim1, grad_layer3->dim2);
 
-    matrix grad_layer2 = backward_pass(&grad_layer3, &layer_3, &output_2, &one_hot_vector);  // Backpropagate from layer 3 to layer 2
-    printf("grad_layer2 dim: %d x %d\n", grad_layer2.dim1, grad_layer2.dim2);
+    matrix* grad_layer2 = backward_pass(grad_layer3, &layer_3, &output_2, &one_hot_vector);  // Backpropagate from layer 3 to layer 2
+    printf("grad_layer2 dim: %d x %d\n", grad_layer2->dim1, grad_layer2->dim2);
 
-    matrix grad_layer1 = backward_pass(&grad_layer2, &layer_2, &output_1, &one_hot_vector);  // Backpropagate from layer 2 to layer 1
-    printf("grad_layer1 dim: %d x %d\n", grad_layer1.dim1, grad_layer1.dim2);
-
-    matrix grad_input = backward_pass(&grad_layer1, &layer_1, &batch, &one_hot_vector);  // Backpropagate from layer 1 to the input
-    printf("grad_input dim: %d x %d\n", grad_input.dim1, grad_input.dim2);
-
- 
-
-    // Print layer gradients to verify
-    printf("Layer 1 Weight Gradients:\n");
-    print_matrix(layer_1.dweights->data, layer_1.dweights->dim1, layer_1.dweights->dim2);
-    
-    printf("Layer 2 Weight Gradients:\n");
-    print_matrix(layer_2.dweights->data, layer_2.dweights->dim1, layer_2.dweights->dim2);
-    
-    printf("Layer 3 Weight Gradients:\n");
-    print_matrix(layer_3.dweights->data, layer_3.dweights->dim1, layer_3.dweights->dim2);
-    
-    printf("Layer 4 Weight Gradients:\n");
-    print_matrix(layer_4.dweights->data, layer_4.dweights->dim1, layer_4.dweights->dim2);
 
 
     // free memory
@@ -823,10 +809,8 @@ int main(int argc, char** argv) {
     // free(losses_one_hot.data);
     // free(losses_sparse.data);
     free(input_gradients.data);
-    free(grad_layer3.data);
-    free(grad_layer2.data);
-    free(grad_layer1.data);
-    free(grad_input.data);
+    free(grad_layer3->data);
+    free(grad_layer2->data);
 
     // free layers last
     free_layer(&layer_1);
