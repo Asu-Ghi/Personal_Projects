@@ -82,16 +82,15 @@ matrix* transpose_matrix(matrix* w){
     return transposed_matrix;
 }
 
-
 // print matrix
-void print_matrix(double* M, int dim1, int dim2) {
-    int m = dim1;  // Number of rows
-    int n = dim2;  // Number of columns
+void print_matrix(matrix* M) {
+    int m = M->dim1;  // Number of rows
+    int n = M->dim2;  // Number of columns
 
     // Loop through the rows and columns of the matrix
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
-            printf("%f ", M[i * n + j]);  // Print element at [i, j]
+            printf("%f ", M->data[i * n + j]);  // Print element at [i, j]
         }
         printf("\n");  // New line after each row
     }

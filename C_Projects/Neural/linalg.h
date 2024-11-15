@@ -18,7 +18,7 @@ void scalar_mult(double* w, double scalar, int dim);
 
 matrix* transpose_matrix(matrix* w); 
 
-void print_matrix(double* M, int dim1, int dim2);
+void print_matrix(matrix* M);
 
 matrix* matrix_mult(matrix* w, matrix* v);
 
