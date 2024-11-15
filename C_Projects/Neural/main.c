@@ -1,21 +1,10 @@
-#include "forward.h"
-#include "backward.h"
+#include "network.h"
 
 /*
 Main Method
 */
 
-int main(int argc, char** argv) {
-    
-    // check if inputs exist
-    if (argc < 2) {
-        printf("Command usage %s num_inputs, num_neurons", argv[0]);
-        exit(1);
-    }
-    // define inputs
-    int num_inputs = atoi(argv[1]);
-    int num_neurons = atoi(argv[2]);
-
+void test_method(){
     // init layers
     layer_dense* layer_1 = init_layer(3, 5,  RELU, 4);
     layer_1->id = "1";
@@ -73,8 +62,8 @@ int main(int argc, char** argv) {
     sparse_vector.dim2 = 1;
 
     // calculate loss from softmax
-    matrix losses_one_hot = loss_categorical_cross_entropy( &one_hot_vector, layer_4, ONE_HOT);
-    matrix losses_sparse = loss_categorical_cross_entropy(&sparse_vector, layer_4, SPARSE);
+    double losses_one_hot = loss_categorical_cross_entropy( &one_hot_vector, layer_4, ONE_HOT);
+    double losses_sparse = loss_categorical_cross_entropy(&sparse_vector, layer_4, SPARSE);
 
     // // calculate  and print accuracy of the batch
     double accuracy_one_hot = calculate_accuracy(&one_hot_vector, layer_4, ONE_HOT);
@@ -84,9 +73,9 @@ int main(int argc, char** argv) {
     printf("Sparse: %f\n", accuracy_sparse);
     printf("------------LOSS-----------\n");
     printf("One_Hot:\n");
-    print_matrix(&losses_one_hot);
+    printf("%f\n",losses_one_hot);
     printf("SPARSE:\n");
-    print_matrix(&losses_sparse);
+    printf("%f\n",losses_sparse);
 
 
 
@@ -122,4 +111,39 @@ int main(int argc, char** argv) {
     free_layer(layer_2);
     free_layer(layer_3);
     free_layer(layer_4);
+
+}
+
+int main(int argc, char** argv) {
+    
+    // check if inputs exist
+    if (argc < 5) {
+        printf("Command usage %s num_layers, batch_size, num_epochs, learning_rate", argv[0]);
+        exit(1);
+    }
+    // define inputs
+    int num_layers = 5;
+    int batch_size = atoi(argv[2]);
+    int num_epochs = atoi(argv[3]);
+    double learning_rate = atof(argv[4]);
+
+    // define number of neurons in each layer
+    int num_neurons_in_layer[5] = {128, 64, 32, 16, 4};
+
+
+    // init neural net
+    // 150 samaples with 4 features (so mult by 4)
+    NeuralNetwork* network = init_neural_network(num_layers, batch_size * 4, num_epochs, num_neurons_in_layer,
+                        learning_rate, RELU);
+
+    // Print neural net info
+    print_nn_info(network);
+
+    // Load Data
+    matrix X;
+    matrix Y;
+    load_iris_data("iris/iris.csv", &X, &Y);
+
+    // Train neural net
+    train_nn(network, &X, &Y);
 }

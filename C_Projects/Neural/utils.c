@@ -113,13 +113,15 @@ layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activati
 
     // initialize a layer dense object
     layer_dense* layer_ = malloc(sizeof(layer_dense));
-
+    layer_->num_inputs = num_inputs;
+    layer_->num_neurons = num_neurons;
+    
     // Allocate memory for layer input and dinput data
     layer_->inputs = malloc(sizeof(matrix));
-    layer_->inputs->dim1 = batch_size;
-    layer_->inputs->dim2 = num_inputs;
+    layer_->inputs->dim1 = num_inputs;
+    layer_->inputs->dim2 = num_neurons;
     layer_->inputs->data = (double*) calloc(layer_->inputs->dim1 * layer_->inputs->dim2, sizeof(double));
-
+    
     // Check memory allocation
     if (layer_->inputs->data == NULL) {
         fprintf(stderr, "Error in memory allocation for inputs in forward pass.\n");
@@ -323,7 +325,7 @@ double calculate_accuracy(matrix* class_targets, layer_dense* final_layer, Class
 /*
 Calculates the loss of the network.
 */
-matrix loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer, ClassLabelEncoding encoding) {
+double loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer, ClassLabelEncoding encoding) {
 
     // check if predictions and true values dim1 match in size
     if(last_layer->post_activation_output->dim1 != true_pred->dim1) {
@@ -418,7 +420,117 @@ matrix loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer
         exit(1);
     }
 
+    // Sum the losses
+    double total_loss = 0.0;
+    for (int i = 0; i < losses.dim1; i++){
+        total_loss += losses.data[i];
+    }
+
     // return losses
-    return(losses);
+    return(total_loss);
 }
 
+/*
+SGD OPTIMIZATION
+ADD INFO HERE
+*/
+void update_params_sgd(layer_dense* layer, double learning_rate) {
+    // Update weights
+    for (int i = 0; i < layer->num_neurons; i++) {
+        for (int j = 0; j < layer->num_inputs; i++) {
+            // W = W - learning_rate * dL/dW
+            layer->weights->data[i * layer->num_inputs + j] -= learning_rate * layer->dweights->data[i * layer->num_inputs + j];
+        }
+    }
+
+    // Update biases
+    for(int i = 0; i < layer->num_neurons; i++) {
+        // b = b - learning_rate * dL/dB
+        layer->biases->data[i] -= learning_rate * layer->dbiases->data[i];
+    }
+}
+
+/*
+ADAGRAD OPTIMIZATION
+ADD INFO HERE
+*/
+
+
+/*
+Loads IRIS Data
+*/
+#define NUM_SAMPLES 150 // Number of data points
+#define NUM_FEATURES 4 // Number of input features
+#define NUM_CLASSES 3 // Number of unique classes (for Iris, Setosa, Versicolor, Virginica)
+
+void load_iris_data(const char* file_path, matrix* X, matrix* Y) {
+    // Allocate memory for X 
+    X->data = (double*)calloc(NUM_SAMPLES * NUM_FEATURES, sizeof(double));
+    X->dim1 = NUM_SAMPLES;
+    X->dim2 = NUM_FEATURES;
+    if(X->data == NULL) {
+        fprintf(stderr, "Error: Memory Allocation for X failed in load data.\n");
+        exit(1);
+    }
+
+    // Allocate memory for Y
+    Y->data = (double*)calloc(NUM_SAMPLES * NUM_CLASSES, sizeof(double));
+    if(Y->data == NULL) {
+        fprintf(stderr, "Error: Memory Allocation for Y failed in load data.\n");
+        free(X->data);
+        exit(1);
+    }
+    Y->dim1 = NUM_SAMPLES;
+    Y->dim2 = NUM_CLASSES;
+
+    // Open file
+    FILE* file = fopen(file_path, "r");
+
+    // Check file was opened succesfully
+    if (file == NULL) {
+        fprintf(stderr, "Error opening file.\n");
+        exit(1);
+    }
+
+    // Initialize character array for lines
+    char line[1024];
+
+    int row = 0;
+    while(fgets(line, sizeof(line), file)) {
+        // Tokenize the lines by comma
+        char* token = strtok(line, ",");
+        int col = 0;
+
+        // Process the features (first 4 tokens)
+        while (token != NULL && col < NUM_FEATURES) {
+            X->data[row * NUM_FEATURES + col] = atof(token);
+            token = strtok(NULL, ",");
+            col++;
+        }
+
+        // Process the label (the last token)
+        if (token != NULL) {
+            // Remove any newline character if present at the end of the label
+            token = strtok(token, "\n");  // This will trim the newline character
+
+            // One-hot encode the label
+            if (strcmp(token, "Iris-setosa") == 0) {
+                Y->data[row * NUM_CLASSES] = 1.0;
+            } else if (strcmp(token, "Iris-versicolor") == 0) {
+                Y->data[row * NUM_CLASSES + 1] = 1.0;
+            } else if (strcmp(token, "Iris-virginica") == 0) {
+                Y->data[row * NUM_CLASSES + 2] = 1.0;
+            }
+        }
+
+        // Increment Row
+        row++;
+        if (row >= X->dim1) {
+            fprintf(stderr, "Error: Too many rows in the dataset\n");
+            break;
+        }     
+    }
+
+    // Close the file
+    fclose(file);
+}

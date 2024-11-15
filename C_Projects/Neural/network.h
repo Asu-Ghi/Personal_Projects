@@ -1,0 +1,60 @@
+#ifndef NETWORK_H
+#define NETWORK_H
+#include "forward.h"
+#include "backward.h"
+
+/*
+Neural Network data structure
+Includes
+    > Pointer to dense layers
+    > Number of layers in the network
+    > The size of the input batch
+    > The learning rate of the network
+    > The number of epochs for training iterations
+    > An array of loss history per training iteration
+*/
+typedef struct {
+    layer_dense** layers;
+    int* num_neurons_in_layer;
+    int num_layers;
+    int batch_size;
+    double learning_rate;
+    int num_epochs;
+    double* loss_history;
+    ActivationType activation;
+} NeuralNetwork;
+
+/*
+Initializes the Neural Network architechture 
+*/
+NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epochs, int* num_neurons_in_layer, double learning_rate,
+                                    ActivationType activation);
+
+
+/*
+Prints information for the neural net.
+*/
+void print_nn_info(NeuralNetwork* network);
+
+/*
+Train the neural network
+*/
+void train_nn(NeuralNetwork* network, matrix* X, matrix* Y);
+
+/*
+Forward pass on the neural network
+*/
+void forward_pass_nn(NeuralNetwork* network, matrix* inputs);
+
+/*
+Backward pass through the neural network
+*/
+void backward_pass_nn(NeuralNetwork* network, matrix* y_true);
+
+/*
+Update the parameters of the neural network
+*/
+void update_parameters(NeuralNetwork* network);
+
+
+#endif
