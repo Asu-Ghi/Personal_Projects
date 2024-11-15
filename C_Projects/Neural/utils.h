@@ -37,6 +37,8 @@ Includes information for forward and backward passes.
 */
 typedef struct {
     char* id;
+    int num_neurons;
+    int num_inputs;
     matrix* weights;
     matrix* biases;
     matrix* inputs;
@@ -125,11 +127,19 @@ Takes in the final layer of softmax outputs.
 Takes in the type of class target encoding (either one hot or sparse)
 Returns a matrix of loss coresponding to the output of softmax and the # of classes to be classified.
 */
-matrix loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer, ClassLabelEncoding encoding);
+double loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer, ClassLabelEncoding encoding);
+
+/*
+SGD Optimization
+ADD INFO HERE
+*/
+void update_params_sgd(layer_dense* layer, double learning_rate);
 
 
-
-
+/*
+Loads IRIS Data in for training
+*/
+void load_iris_data(const char* file_path, matrix* X, matrix* Y);
 
 
 #endif
