@@ -1,10 +1,8 @@
 #include "network.h"
 
-/*
-Initializes the neural network
-*/
+
 NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epochs, int* num_neurons_in_layer, double learning_rate,
-                                   ActivationType activation, int num_features) {
+                                   ActivationType activation, int num_batch_features) {
 
     // Allocate memory for the network
     NeuralNetwork* n_network = (NeuralNetwork*)malloc(sizeof(NeuralNetwork));
@@ -22,7 +20,7 @@ NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epoch
     n_network->layers = (layer_dense**) malloc(n_network->num_layers * sizeof(layer_dense*));
 
     // Allocate memory for the first layer with `num_features`
-    n_network->layers[0] = init_layer(num_features, n_network->num_neurons_in_layer[0], n_network->activation, n_network->batch_size);
+    n_network->layers[0] = init_layer(num_batch_features, n_network->num_neurons_in_layer[0], n_network->activation, n_network->batch_size);
 
     // Allocate memory for hidden layers
     for (int i = 1; i < n_network->num_layers - 1; i++) {
@@ -37,9 +35,15 @@ NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epoch
     return n_network;
 }
 
-/*
-Displays Neural Net Information
-*/
+void free_neural_network(NeuralNetwork* network) {
+    for (int i = 0; i < network->num_layers; i++) {
+        free_layer(network->layers[i]);
+    }
+    free(network->loss_history);
+    free(network->layers);
+    free(network);
+}
+
 void print_nn_info(NeuralNetwork* network) {
     // Print network constraints
     printf("NUMBER OF LAYERS: %d\n", network->num_layers);
@@ -48,9 +52,6 @@ void print_nn_info(NeuralNetwork* network) {
     printf("LEARNING RATE: %f\n", network->learning_rate);
 }
 
-/*
-Forward pass on the neural network
-*/
 void forward_pass_nn(NeuralNetwork* network, matrix* inputs) {
 
     // First forward pass
@@ -65,9 +66,6 @@ void forward_pass_nn(NeuralNetwork* network, matrix* inputs) {
     forward_pass(network->layers[network->num_layers - 2]->post_activation_output, network->layers[network->num_layers - 1]);
 }
 
-/*
-Backward Pass on the Neural Nework.
-*/
 void backward_pass_nn(NeuralNetwork* network, matrix* y_pred) {
 
     // Start with the backward pass for softmax and loss
@@ -80,9 +78,6 @@ void backward_pass_nn(NeuralNetwork* network, matrix* y_pred) {
     
 }
 
-/*
-Update the parameters in the neural network
-*/
 void update_parameters(NeuralNetwork* network) {
     // Loop through the first and all hidden layers
     for (int i = 0; i < network->num_layers - 1; i++) {
@@ -91,28 +86,21 @@ void update_parameters(NeuralNetwork* network) {
     }
 }
 
-/*
-Train the neural network 
-*/
 void train_nn(NeuralNetwork* network, matrix* X, matrix* Y) {
 
     for (int epoch = 0; epoch < network->num_epochs; epoch++) {
 
         // Step 1: Forward Pass
-        printf("Arrived at forward pass.\n");
         forward_pass_nn(network, X);
 
         // Step 2: Calculate Loss and Accuracy
-        printf("Arrived at accuracy.\n");
-        printf("Y dim %d x %d\n", Y->dim1, Y->dim2);
-        printf("Final Layer dim %d x %d\n", network->layers[network->num_layers-1]->post_activation_output->dim1,network->layers[network->num_layers-1]->post_activation_output->dim2);
         double accuracy = calculate_accuracy(Y, network->layers[network->num_layers-1], ONE_HOT);
-        matrix* loss_for_examples = loss_categorical_cross_entropy(Y, network->layers[network->num_layers-1], ONE_HOT);
+        matrix* example_losses = loss_categorical_cross_entropy(Y, network->layers[network->num_layers-1], ONE_HOT);
 
         // calculate batch loss
         double batch_loss = 0.0;
         for (int i = 0; i < network->batch_size; i++) {
-            batch_loss+= loss_for_examples->data[i];
+            batch_loss+= example_losses->data[i];
         }
         batch_loss = batch_loss/network->batch_size;
 
@@ -123,19 +111,13 @@ void train_nn(NeuralNetwork* network, matrix* X, matrix* Y) {
         printf("Epoch %d: Loss = %f, Accuracy = %f\n", epoch, batch_loss, accuracy);
 
         // Step 3: Backward Pass
-        printf("Arrived at backwards pass.\n");
         backward_pass_nn(network, Y);
 
         // Step 4: Update Weights
-        printf("Arrived at update weights.\n");
         update_parameters(network);
     }
 }
 
-/*
-Predict on the network
-*/
-// Function to predict a class label for new data (for classification)
 void predict(NeuralNetwork* network, matrix* input_data) {
     // Check if the input data dimensions match the expected input size
     if (input_data->dim2 != network->layers[0]->num_inputs) {

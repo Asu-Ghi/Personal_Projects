@@ -37,12 +37,6 @@ void test_matrix_transpose() {
     printf("//////////////////////////////////////////////////////\n");
 }
 
-/*
-Test Matrix Multiplication.
-Compares M1(4x1) * M2(1x4) 
-M1- >[1, 2, 3, 4]
-M2 -> 1, 2, 3, 4]
-*/
 void test_matrix_mult() {
     printf("//////////////////////////////////////////////////////\n");
     printf("////////////// START TEST MATRIX MULT ////////////////\n");
@@ -111,32 +105,6 @@ void test_matrix_mult() {
 
 ///////////////////////////////////////////////////LAYER FUNCTIONS////////////////////////////////////////////////////////////////
 
-// Define network constants for 3 layers -> Used in testing
-#define BATCH_SIZE 3
-#define NUM_BATCH_FEATURES 3
-
-#define NUM_NEURONS_1 4
-
-#define NUM_INPUT_FEATURES_2 4
-#define NUM_NEURONS_2 3
-
-#define NUM_INPUT_FEATURES_3 3
-#define NUM_NEURONS_3 3 // Matches num of batch features in classification
-
-/*
-Test Init Layer
-
-Num inputs -> 3
-Num neurons -> 4
-Activation Type -> RELU
-Batch_Size -> 10
-
-Expected Dimensions:
-    >Weights/dWeights -> 3x4
-    >Biases/dBiases -> 1x4
-    >Inputs/dInputs -> 10x3
-    >Pre/Post Activation Outputs -> 10x4
-*/
 void test_init_layer() {
     printf("//////////////////////////////////////////////////////\n");
     printf("/////////////// START TEST INIT LAYER ////////////////\n");
@@ -227,18 +195,6 @@ void test_init_layer() {
     printf("//////////////////////////////////////////////////////\n");
 }
 
-/*
-Test Free Layer
-*/
-void test_free_layer() {
-    exit(1);
-}
-
-/*
-Test Forward Pass
-Input Data = [[1, 2, 3], [1, 2, 3]]
-NOTE (WEIGHT RANDOMIZATION MUST HAVE A SET SEED OF 42)
-*/
 void test_forward_pass() {
     // Initialize input matrix
     matrix inputs;
@@ -355,11 +311,6 @@ void test_forward_pass() {
     printf("//////////////////////////////////////////////////////\n");
 }
 
-/*
-Test Accuracy
-Inputs = [[1,2,3], [1,2,3]]
-Network based off defined values.
-*/
 void test_accuracy() {
     printf("//////////////////////////////////////////////////////\n");
     printf("///////////////// START TEST ACCURACY ////////////////\n");
@@ -409,9 +360,6 @@ void test_accuracy() {
     free_layer(layer_three);
 }
 
-/*
-Test Loss (Categorical Cross Entropy)
-*/
 void test_loss_categorical() {
 
     printf("//////////////////////////////////////////////////////\n");
@@ -485,9 +433,6 @@ void test_loss_categorical() {
 
 }
 
-/*
-Test Backward SoftMax
-*/
 void test_backward_pass() {
     printf("//////////////////////////////////////////////////////\n");
     printf("//////////// START TEST BACKWARDS ////////////////////\n");
@@ -720,12 +665,318 @@ void test_backward_pass() {
 
 }
 
-/*
-Test Stochastic Gradient Descent Method
-*/
 void test_update_params_sgd() {
-    exit(1);
+    printf("//////////////////////////////////////////////////////\n");
+    printf("////////////////// START TEST SGD ////////////////////\n");
+    printf("//////////////////////////////////////////////////////\n");
+    // Set learning rate
+    double learning_rate = 0.01;
+
+    // Initialize data and class targets
+    matrix inputs;
+    inputs.dim1 = BATCH_SIZE;
+    inputs.dim2 = NUM_BATCH_FEATURES;
+    double input_data[9] = {5.1, 3.5, 1.4, 0.2, 4.9, 3.0, 1.4, 0.2, 4.7};  // Example: 3 samples, 3 features each
+    inputs.data = input_data;
+
+
+    matrix class_targets;
+    class_targets.dim1 = BATCH_SIZE;
+    class_targets.dim2 = NUM_BATCH_FEATURES;
+    double class_target_data[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};  // 3 samples, 3 classes
+    class_targets.data = class_target_data;
+
+    // Initialize 3 layer network
+    layer_dense* layer_one = init_layer(NUM_BATCH_FEATURES, NUM_NEURONS_1, RELU, BATCH_SIZE);
+    layer_dense* layer_two = init_layer(NUM_INPUT_FEATURES_2, NUM_NEURONS_2, RELU, BATCH_SIZE);
+    layer_dense* layer_three = init_layer(NUM_INPUT_FEATURES_3, NUM_NEURONS_3, SOFTMAX, BATCH_SIZE);
+
+    // Allocate memory for 
+
+    // Test with epoch of 20
+    for (int i = 0; i < 20; i++) {
+      
+        // Perform forward pass
+        forward_pass(&inputs, layer_one);
+        forward_pass(layer_one->post_activation_output, layer_two);
+        forward_pass(layer_two->post_activation_output, layer_three);
+
+        // Calculate loss and accuracy
+        matrix* sample_losses = loss_categorical_cross_entropy(&class_targets, layer_three, ONE_HOT);
+        double accuaracy = calculate_accuracy(&class_targets, layer_three, ONE_HOT);
+        double batch_loss = 0.0;
+        for (int j = 0; j < BATCH_SIZE; j++) {
+            batch_loss+= sample_losses->data[j];
+        }
+        batch_loss = batch_loss / BATCH_SIZE;
+
+        // Print loss and accuracy over epoch
+        printf("Epoch: %d, Loss: %.3f, Accuaracy: %.3f\n", i, batch_loss, accuaracy);
+
+        // Perform backward pass
+        backwards_softmax_and_loss(&class_targets, layer_three);
+        backward_reLu(layer_three->dinputs, layer_two);
+        backward_reLu(layer_two->dinputs, layer_one);
+
+        // Update parameters for the layers
+        update_params_sgd(layer_one, learning_rate);
+        update_params_sgd(layer_two, learning_rate);
+        update_params_sgd(layer_three, learning_rate);
+    }
+
+    printf("//////////////////////////////////////////////////////\n");
+    printf("//////////////////// END TEST SGD ////////////////////\n");
+    printf("//////////////////////////////////////////////////////\n");
 }
+
+///////////////////////////////////////////////////NETWORK FUNCTIONS////////////////////////////////////////////////////////////////
+
+void test_init_neural_network() {
+    printf("//////////////////////////////////////////////////////\n");
+    printf("////////// START TEST INIT_NEURAL_NETWORK ////////////\n");
+    printf("//////////////////////////////////////////////////////\n");
+    // Create int array off defined constants
+    int num_neurons_in_layers[NUM_LAYERS] = {NUM_NEURONS_LAYER_1, NUM_NEURONS_LAYER_2, NUM_NEURONS_LAYER_3};
+    // Initialize layer based off defined constants
+    NeuralNetwork* test_network = init_neural_network(NUM_LAYERS, BATCH_SIZE, NUM_EPOCHS, num_neurons_in_layers, 
+                                                LEARNING_RATE, RELU, NUM_BATCH_FEATURES);
+
+    // Check to see if layer was allocated properly
+    if (test_network == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed for test network in test_init_neural_network.\n");
+        exit(1);
+    }
+    
+    // Check to see if layers have correct dimensions
+    if (test_network->layers[0]->num_inputs != NUM_BATCH_FEATURES || test_network->layers[0]->num_neurons!=NUM_NEURONS_LAYER_1) {
+        fprintf(stderr, "Error: Layer 1 dimensions incorrect in test init neural network.\n");
+        free_neural_network(test_network);
+        exit(1);
+    }
+
+    if (test_network->layers[1]->num_inputs != NUM_NEURONS_LAYER_1 || test_network->layers[1]->num_neurons!=NUM_NEURONS_LAYER_2) {
+        fprintf(stderr, "Error: Layer 2 dimensions incorrect in test init neural network.\n");
+        free_neural_network(test_network);
+        exit(1);
+    }
+
+    if (test_network->layers[2]->num_inputs != NUM_NEURONS_LAYER_2 || test_network->layers[2]->num_neurons!=NUM_NEURONS_LAYER_3) {
+        fprintf(stderr, "Error: Layer 3 dimensions incorrect in test init neural network.\n");
+        free_neural_network(test_network);
+        exit(1);
+    }
+    
+    // Check to see if layers have correct activation functions
+    if (test_network->layers[0]->activation != RELU) {
+        fprintf(stderr, "Error: Layer 1 has incorrect activation function.\n");
+        free_neural_network(test_network);
+        exit(1);
+    }
+
+    if (test_network->layers[1]->activation != RELU) {
+        fprintf(stderr, "Error: Layer 2 has incorrect activation function.\n");
+        free_neural_network(test_network);
+        exit(1);
+    }
+
+    if (test_network->layers[2]->activation != SOFTMAX) {
+        fprintf(stderr, "Error: Layer 3 has incorrect activation function.\n");
+        free_neural_network(test_network);
+        exit(1);
+    }
+
+    // Print Neural Network Info
+    print_nn_info(test_network);
+    
+    // Free memory
+    free_neural_network(test_network);
+    printf("//////////////////////////////////////////////////////\n");
+    printf("//////////// END TEST INIT_NEURAL_NETWORK ////////////\n");
+    printf("//////////////////////////////////////////////////////\n");
+}
+
+void test_forward_pass_nn() {
+    printf("//////////////////////////////////////////////////////\n");
+    printf("//////////// START TEST FORWARD_PASS_NN //////////////\n");
+    printf("//////////////////////////////////////////////////////\n");
+    // Create int array off defined constants
+    int num_neurons_in_layers[NUM_LAYERS] = {NUM_NEURONS_LAYER_1, NUM_NEURONS_LAYER_2, NUM_NEURONS_LAYER_3};
+    // Initialize layer based off defined constants
+    NeuralNetwork* network = init_neural_network(NUM_LAYERS, BATCH_SIZE, NUM_EPOCHS, num_neurons_in_layers, 
+                                                LEARNING_RATE, RELU, NUM_BATCH_FEATURES);
+
+    // Check to see if layer was allocated properly
+    if (network == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed for test network in test_forward_pass_nn.\n");
+        exit(1);
+    } 
+
+    // Initialize input data
+    matrix inputs;
+    inputs.dim1 = BATCH_SIZE;
+    inputs.dim2 = NUM_BATCH_FEATURES;
+    double input_data[9] = {5.1, 3.5, 1.4, 0.2, 4.9, 3.0, 1.4, 0.2, 4.7};  // Example: 3 samples, 3 features each
+    inputs.data = input_data;
+
+    // Call forward pass, verify outputs
+    forward_pass_nn(network, &inputs);
+    printf("#################################\n");
+    printf("------------LAYER 1-----------\n");
+    printf("------------INPUTS-------------\n");
+    print_matrix(network->layers[0]->inputs);
+    printf("------------WEIGHTS-----------\n");
+    print_matrix(network->layers[0]->weights);
+    printf("------------BIASES-----------\n");
+    print_matrix(network->layers[0]->biases);
+    printf("-----PRE_ACTIVATION_OUTPUTS-----------\n");
+    print_matrix(network->layers[0]->pre_activation_output);
+    printf("-----POST_ACTIVATION_OUTPUTS-----------\n");
+    print_matrix(network->layers[0]->post_activation_output);
+    printf("------------------------------\n");
+    printf("------------LAYER 2-----------\n");
+    printf("------------INPUTS-------------\n");
+    print_matrix(network->layers[1]->inputs);
+    printf("------------WEIGHTS-----------\n");
+    print_matrix(network->layers[1]->weights);
+    printf("------------BIASES-----------\n");
+    print_matrix(network->layers[1]->biases);
+    printf("-----PRE_ACTIVATION_OUTPUTS-----------\n");
+    print_matrix(network->layers[1]->pre_activation_output);
+    printf("-----POST_ACTIVATION_OUTPUTS-----------\n");
+    print_matrix(network->layers[1]->post_activation_output);
+    printf("------------------------------\n");
+    printf("------------LAYER 3-----------\n");
+    printf("------------INPUTS-------------\n");
+    print_matrix(network->layers[2]->inputs);
+    printf("------------WEIGHTS-----------\n");
+    print_matrix(network->layers[2]->weights);
+    printf("------------BIASES-----------\n");
+    print_matrix(network->layers[2]->biases);
+    printf("-----PRE_ACTIVATION_OUTPUTS-----------\n");
+    print_matrix(network->layers[2]->pre_activation_output);
+    printf("-----POST_ACTIVATION_OUTPUTS-----------\n");
+    print_matrix(network->layers[2]->post_activation_output);
+    printf("#################################\n");
+    
+    // Free memory
+    free_neural_network(network);
+
+    printf("//////////////////////////////////////////////////////\n");
+    printf("//////////// END TEST FORWARD_PASS_NN //////////////\n");
+    printf("//////////////////////////////////////////////////////\n");
+
+}
+
+void test_backward_pass_nn() {
+    printf("//////////////////////////////////////////////////////\n");
+    printf("//////////// START TEST BACKWARDS_PASS_NN //////////////\n");
+    printf("//////////////////////////////////////////////////////\n");
+    // Create int array off defined constants
+    int num_neurons_in_layers[NUM_LAYERS] = {NUM_NEURONS_LAYER_1, NUM_NEURONS_LAYER_2, NUM_NEURONS_LAYER_3};
+    // Initialize layer based off defined constants
+    NeuralNetwork* network = init_neural_network(NUM_LAYERS, BATCH_SIZE, NUM_EPOCHS, num_neurons_in_layers, 
+                                                LEARNING_RATE, RELU, NUM_BATCH_FEATURES);
+
+    // Check to see if layer was allocated properly
+    if (network == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed for test network in test_forward_pass_nn.\n");
+        exit(1);
+    } 
+
+    // Initialize input data
+    matrix inputs;
+    inputs.dim1 = BATCH_SIZE;
+    inputs.dim2 = NUM_BATCH_FEATURES;
+    double input_data[9] = {5.1, 3.5, 1.4, 0.2, 4.9, 3.0, 1.4, 0.2, 4.7};  // Example: 3 samples, 3 features each
+    inputs.data = input_data;
+
+    // Initialize class target data
+    matrix class_targets;
+    class_targets.dim1 = BATCH_SIZE;
+    class_targets.dim2 = NUM_BATCH_FEATURES;
+    double class_target_data[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};  // 3 samples, 3 classes
+    class_targets.data = class_target_data;
+
+    // Call forward pass, 
+    forward_pass_nn(network, &inputs);
+    
+    // Call backward pass
+    backward_pass_nn(network, &class_targets);
+
+    // Verify outputs
+    printf("#################################\n");
+    printf("------------LAYER 3-----------\n");
+    printf("------------DWEIGHTS-------------\n");
+    print_matrix(network->layers[2]->dweights);
+    printf("------------DBIASES-----------\n");
+    print_matrix(network->layers[2]->dbiases);
+    printf("------------DINPUTS-----------\n");
+    print_matrix(network->layers[2]->dinputs);
+    printf("------------------------------\n");
+    printf("------------LAYER 2-----------\n");
+    printf("------------DWEIGHTS-------------\n");
+    print_matrix(network->layers[1]->dweights);
+    printf("------------DBIASES-----------\n");
+    print_matrix(network->layers[1]->dbiases);
+    printf("------------DINPUTS-----------\n");
+    print_matrix(network->layers[1]->dinputs);
+    printf("------------------------------\n");
+    printf("------------LAYER 1-----------\n");
+    printf("------------DWEIGHTS-------------\n");
+    print_matrix(network->layers[0]->dweights);
+    printf("------------DBIASES-----------\n");
+    print_matrix(network->layers[0]->dbiases);
+    printf("------------DINPUTS-----------\n");
+    print_matrix(network->layers[0]->dinputs);
+    printf("------------------------------\n");
+    printf("#################################\n");
+
+    // Free memory
+    free_neural_network(network);
+    printf("//////////////////////////////////////////////////////\n");
+    printf("//////////// END TEST BACKWARDS_PASS_NN //////////////\n");
+    printf("//////////////////////////////////////////////////////\n");  
+}
+
+void test_train_nn(){
+    printf("//////////////////////////////////////////////////////\n");
+    printf("///////////////// START TEST_TRAIN_NN ////////////////\n");
+    printf("//////////////////////////////////////////////////////\n");
+    // Create int array off defined constants
+    int num_neurons_in_layers[NUM_LAYERS] = {NUM_NEURONS_LAYER_1, NUM_NEURONS_LAYER_2, NUM_NEURONS_LAYER_3};
+    // Initialize layer based off defined constants
+    NeuralNetwork* network = init_neural_network(NUM_LAYERS, BATCH_SIZE, NUM_EPOCHS, num_neurons_in_layers, 
+                                                LEARNING_RATE, RELU, NUM_BATCH_FEATURES);
+
+    // Check to see if layer was allocated properly
+    if (network == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed for test network in test_forward_pass_nn.\n");
+        exit(1);
+    } 
+
+    // Initialize input data
+    matrix inputs;
+    inputs.dim1 = BATCH_SIZE;
+    inputs.dim2 = NUM_BATCH_FEATURES;
+    double input_data[9] = {5.1, 3.5, 1.4, 0.2, 4.9, 3.0, 1.4, 0.2, 4.7};  // Example: 3 samples, 3 features each
+    inputs.data = input_data;
+
+    // Initialize class target data
+    matrix class_targets;
+    class_targets.dim1 = BATCH_SIZE;
+    class_targets.dim2 = NUM_BATCH_FEATURES;
+    double class_target_data[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};  // 3 samples, 3 classes
+    class_targets.data = class_target_data;
+
+    // Check output
+    train_nn(network, &inputs,&class_targets);
+
+    free_neural_network(network);
+    printf("//////////////////////////////////////////////////////\n");
+    printf("///////////////// END TEST_TRAIN_NN //////////////////\n");
+    printf("//////////////////////////////////////////////////////\n");
+}
+
 
 //////////////////////////////////////////////////TEST ALL METHODS/////////////////////////////////////////////////////////////////
 
@@ -740,4 +991,11 @@ void test_all_methods() {
     test_backward_pass();
     test_accuracy();
     test_loss_categorical();
+    test_update_params_sgd();
+    test_init_neural_network();
+    // Uneeded kind of overkill but useful maybe later for debugging.
+    // test_forward_pass_nn();
+    // test_backward_pass_nn();
+    test_train_nn();
+    
 }

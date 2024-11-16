@@ -29,7 +29,10 @@ Initializes the Neural Network architechture
 */
 NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epochs, int* num_neurons_in_layer, double learning_rate,
                                    ActivationType activation, int num_features);
-
+/*
+Frees neural network from memory
+*/
+void free_neural_network(NeuralNetwork* network);
 
 /*
 Prints information for the neural net.
