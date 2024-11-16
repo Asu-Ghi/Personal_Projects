@@ -109,7 +109,6 @@ matrix* matrix_mult(matrix* w, matrix* v) {
 }
 
 
-
 //////////////////////////////////////////////////// Network Methods //////////////////////////////////////////////////////////////////
 
 /*
@@ -460,7 +459,6 @@ ADD INFO HERE
 /*
 Loads IRIS Data
 */
-
 #define NUM_FEATURES 4
 #define NUM_CLASSES 3
 void load_iris_data(const char* file_path, matrix* X_train, matrix* Y_train, matrix* X_test, matrix* Y_test, int num_batches, float train_ratio) {

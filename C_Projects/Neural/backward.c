@@ -181,7 +181,6 @@ void backward_reLu(matrix* input_gradients, layer_dense* layer) {
     free(inputs_transposed);
 }
 
-
 /*
 Takes in true labels used for classification and the current layer.
 Calculates the derivatives of 

@@ -39,7 +39,6 @@ NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epoch
     return n_network;
 }
 
-
 /*
 Displays Neural Net Information
 */
@@ -82,7 +81,6 @@ void backward_pass_nn(NeuralNetwork* network, matrix* y_pred) {
     }
     
 }
-
 
 /*
 Update the parameters in the neural network
