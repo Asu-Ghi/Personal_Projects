@@ -124,5 +124,5 @@ int main(int argc, char** argv) {
     // }
 
     // test_all_methods();
-    test_backward_pass();
+    test_all_methods();
 }

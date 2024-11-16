@@ -1,7 +1,5 @@
 #include "network.h"
 
-
-
 /*
 Initializes the neural network
 */
