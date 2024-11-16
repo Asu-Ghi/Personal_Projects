@@ -1,10 +1,6 @@
 #include "network.h"
 #include "test_functions.h"
 
-/*
-Main Method
-*/
-
 void backup(){
     // init layers
     layer_dense* layer_1 = init_layer(3, 5,  RELU, 4);
@@ -117,6 +113,9 @@ void backup(){
 
 #define NUM_FEATURES 4
 #define NUM_CLASSES 3
+/*
+Main Method
+*/
 int main(int argc, char** argv) {
     // Check command-line arguments (same as before)
     // if (argc < 5) {
@@ -125,5 +124,5 @@ int main(int argc, char** argv) {
     // }
 
     // test_all_methods();
-    test_loss_categorical();
+    test_backward_pass();
 }

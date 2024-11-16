@@ -49,22 +49,14 @@ Test Accuracy
 void test_accuracy();
 
 /*
-Test Backwards softmax
+Test Backwards softmax and ReLu
 */
-void test_backward_softmax();
+void test_backward_pass();
 
 /*
-Test Backwards ReLu
+Test Stochastic Gradient Descent Method
 */
-void test_backward_ReLu();
-
-
-
-/*
-Test Linear Algebra Functions
-*/
-
-
+void test_update_params_sgd();
 
 ///////////////////////////////////////////////////NETWORK FUNCTIONS////////////////////////////////////////////////////////////////
 
