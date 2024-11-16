@@ -14,13 +14,13 @@ Used to send the derivatives of input (gradients) backwards to the layer before.
 void backward_reLu(matrix* input_gradients, layer_dense* layer) {
 
     // Print debug info
-    printf("---------LAYER %s---------\n", layer->id);
-    printf("----Inputs---\n");
-    print_matrix(layer->inputs);
-    printf("----Input Gradients---\n");
-    print_matrix(input_gradients);
-    printf("----Layer_Outputs(After Activation)---\n");
-    print_matrix(layer->post_activation_output);
+    // printf("---------LAYER ---------\n");
+    // printf("----Inputs---\n");
+    // print_matrix(layer->inputs);
+    // printf("----Input Gradients---\n");
+    // print_matrix(input_gradients);
+    // printf("----Layer_Outputs(After Activation)---\n");
+    // print_matrix(layer->post_activation_output);
 
     /*
     Find Gradient of the ReLu of the layer.
@@ -161,14 +161,14 @@ void backward_reLu(matrix* input_gradients, layer_dense* layer) {
     }
 
     // debugging
-    printf("-------- WEIGHT GRADIENTS------------\n");
-    print_matrix(layer->dweights);
+    // printf("-------- WEIGHT GRADIENTS------------\n");
+    // print_matrix(layer->dweights);
 
-    printf("--------BIAS GRADIENTS------------\n");
-    print_matrix(layer->dbiases);
+    // printf("--------BIAS GRADIENTS------------\n");
+    // print_matrix(layer->dbiases);
 
-    printf("--------INPUT GRADIENTS ------------\n");
-    print_matrix(layer->dinputs);
+    // printf("--------INPUT GRADIENTS ------------\n");
+    // print_matrix(layer->dinputs);
 
     // free unused memory
     free(output_gradients->data);
@@ -193,12 +193,12 @@ Used to send the derivatives of input (gradients) backwards to the layer before.
 */
 void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
 
-    // Print debug info
-    printf("---------LAYER %s---------\n", layer->id);
-    printf("----Layer_Inputs---\n");
-    print_matrix(layer->inputs);
-    printf("----Layer_Outputs(After Activation)---\n");
-    print_matrix(layer->post_activation_output);
+    // // Print debug info
+    // printf("---------LAYER ---------\n");
+    // printf("----Layer_Inputs---\n");
+    // print_matrix(layer->inputs);
+    // printf("----Layer_Outputs(After Activation)---\n");
+    // print_matrix(layer->post_activation_output);
 
     // Check dimensionality
     if (layer->post_activation_output->dim1 != true_labels->dim1 || layer->post_activation_output->dim2 != true_labels->dim2) {
@@ -345,14 +345,14 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
     }
 
     // Debug printing
-    printf("-------WEIGHT GRADIENTS------\n");
-    print_matrix(layer->dweights);
+    // printf("-------WEIGHT GRADIENTS------\n");
+    // print_matrix(layer->dweights);
 
-    printf("-------BIAS GRADIENTS------\n");
-    print_matrix(layer->dbiases);
+    // printf("-------BIAS GRADIENTS------\n");
+    // print_matrix(layer->dbiases);
 
-    printf("-------INPUT(SOFTMAX) GRADIENTS------\n");
-    print_matrix(layer->dinputs);
+    // printf("-------INPUT(SOFTMAX) GRADIENTS------\n");
+    // print_matrix(layer->dinputs);
 
     // free unused memory
     free(output_gradients->data);

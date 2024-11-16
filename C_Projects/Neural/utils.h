@@ -127,7 +127,7 @@ Takes in the final layer of softmax outputs.
 Takes in the type of class target encoding (either one hot or sparse)
 Returns a matrix of loss coresponding to the output of softmax and the # of classes to be classified.
 */
-double loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer, ClassLabelEncoding encoding);
+matrix* loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer, ClassLabelEncoding encoding);
 
 /*
 SGD Optimization
@@ -139,7 +139,8 @@ void update_params_sgd(layer_dense* layer, double learning_rate);
 /*
 Loads IRIS Data in for training
 */
-void load_iris_data(const char* file_path, matrix* X, matrix* Y);
+void load_iris_data(const char* file_path, matrix* X_train, matrix* Y_train, matrix* X_test,
+ matrix* Y_test, int num_batches, float train_ratio);
 
 
 #endif

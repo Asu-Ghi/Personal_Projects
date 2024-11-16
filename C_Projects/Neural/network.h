@@ -28,7 +28,7 @@ typedef struct {
 Initializes the Neural Network architechture 
 */
 NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epochs, int* num_neurons_in_layer, double learning_rate,
-                                    ActivationType activation);
+                                   ActivationType activation, int num_features);
 
 
 /*
@@ -56,5 +56,10 @@ Update the parameters of the neural network
 */
 void update_parameters(NeuralNetwork* network);
 
+/*
+Predict on the network
+*/
+// Function to predict a class label for new data (for classification)
+void predict(NeuralNetwork* network, matrix* input_data);
 
 #endif

@@ -12,6 +12,13 @@ Includes dimensionality checks, allocates memory on the heap for the return poin
 (row_w x col_w) => (col_w x row_w)
 */
 matrix* transpose_matrix(matrix* w){
+
+    // Check if w has data
+    if (w->data == NULL) {
+        fprintf(stderr, "Error: Input Matrix has no data (NULL).\n");
+        exit(1);
+    }
+
     // Create a new matrix object to hold the transposed matrix
     matrix* transposed_matrix = (matrix*) malloc(sizeof(matrix));
 
@@ -118,8 +125,8 @@ layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activati
     
     // Allocate memory for layer input and dinput data
     layer_->inputs = malloc(sizeof(matrix));
-    layer_->inputs->dim1 = num_inputs;
-    layer_->inputs->dim2 = num_neurons;
+    layer_->inputs->dim1 = batch_size;
+    layer_->inputs->dim2 = num_inputs;
     layer_->inputs->data = (double*) calloc(layer_->inputs->dim1 * layer_->inputs->dim2, sizeof(double));
     
     // Check memory allocation
@@ -323,9 +330,9 @@ double calculate_accuracy(matrix* class_targets, layer_dense* final_layer, Class
 }
 
 /*
-Calculates the loss of the network.
+Calculates the losses for each example in the batch of the network.
 */
-double loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer, ClassLabelEncoding encoding) {
+matrix* loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer, ClassLabelEncoding encoding) {
 
     // check if predictions and true values dim1 match in size
     if(last_layer->post_activation_output->dim1 != true_pred->dim1) {
@@ -334,10 +341,10 @@ double loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer
     }
 
     // initialize losses data.
-    matrix losses;
-    losses.data = (double*) calloc(last_layer->post_activation_output->dim1, sizeof(double));
-    losses.dim1 = last_layer->post_activation_output->dim1;
-    losses.dim2 = 1;
+    matrix* losses = malloc(sizeof(matrix));
+    losses->data = (double*) calloc(last_layer->post_activation_output->dim1, sizeof(double));
+    losses->dim1 = last_layer->post_activation_output->dim1;
+    losses->dim2 = 1;
 
     // one hot encoded assumption
     if(encoding == ONE_HOT) {
@@ -345,7 +352,7 @@ double loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer
         // check if one hot is the correct size
         if (last_layer->post_activation_output->dim2 != true_pred->dim2) {
             fprintf(stderr, "Error: Dimension 2 for one hot vectors and predictions do not match.\n");
-            free(losses.data);
+            free(losses->data);
             exit(1);
         }
 
@@ -364,7 +371,7 @@ double loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer
             // error handling if no true class is found
             if(true_class == -1) {
                 fprintf(stderr, "Error: No true class found in one hot vectors. \n");
-                free(losses.data);
+                free(losses->data);
                 exit(1);
             }
 
@@ -378,7 +385,7 @@ double loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer
             
             // calcuale -log loss for the sample in question and append to loss matrix
             double loss = -log(predicted_sample);
-            losses.data[i] = loss;
+            losses->data[i] = loss;
         }
     }
 
@@ -394,7 +401,7 @@ double loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer
             // Error handling, check if true class is in bounds of prediction vectors
             if (true_class < 0 || true_class >= last_layer->post_activation_output->dim2) {
                 fprintf(stderr,"Error: True class dimensions out of bounds. \n");
-                free(losses.data);
+                free(losses->data);
                 exit(1);
             }  
 
@@ -409,25 +416,19 @@ double loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer
             // calcuale -log loss for the sample in question and append to loss matrix
             double loss = -log(predicted_sample);
             
-            losses.data[i] = loss;
+            losses->data[i] = loss;
         }
     }
 
     // error handling
     else {
         fprintf(stderr, "Error: Incorrect type encoding provided. \n");
-        free(losses.data);
+        free(losses->data);
         exit(1);
     }
 
-    // Sum the losses
-    double total_loss = 0.0;
-    for (int i = 0; i < losses.dim1; i++){
-        total_loss += losses.data[i];
-    }
-
     // return losses
-    return(total_loss);
+    return(losses);
 }
 
 /*
@@ -437,7 +438,7 @@ ADD INFO HERE
 void update_params_sgd(layer_dense* layer, double learning_rate) {
     // Update weights
     for (int i = 0; i < layer->num_neurons; i++) {
-        for (int j = 0; j < layer->num_inputs; i++) {
+        for (int j = 0; j < layer->num_inputs; j++) {
             // W = W - learning_rate * dL/dW
             layer->weights->data[i * layer->num_inputs + j] -= learning_rate * layer->dweights->data[i * layer->num_inputs + j];
         }
@@ -459,34 +460,27 @@ ADD INFO HERE
 /*
 Loads IRIS Data
 */
-#define NUM_SAMPLES 150 // Number of data points
-#define NUM_FEATURES 4 // Number of input features
-#define NUM_CLASSES 3 // Number of unique classes (for Iris, Setosa, Versicolor, Virginica)
 
-void load_iris_data(const char* file_path, matrix* X, matrix* Y) {
-    // Allocate memory for X 
-    X->data = (double*)calloc(NUM_SAMPLES * NUM_FEATURES, sizeof(double));
-    X->dim1 = NUM_SAMPLES;
-    X->dim2 = NUM_FEATURES;
-    if(X->data == NULL) {
-        fprintf(stderr, "Error: Memory Allocation for X failed in load data.\n");
+#define NUM_FEATURES 4
+#define NUM_CLASSES 3
+void load_iris_data(const char* file_path, matrix* X_train, matrix* Y_train, matrix* X_test, matrix* Y_test, int num_batches, float train_ratio) {
+    // Allocate memory for temporary X and Y
+    matrix X_temp, Y_temp;
+    X_temp.dim1 = num_batches;
+    X_temp.dim2 = NUM_FEATURES;
+    Y_temp.dim1 = num_batches;
+    Y_temp.dim2 = NUM_CLASSES;
+
+    X_temp.data = (double*)calloc(X_temp.dim1 * X_temp.dim2, sizeof(double));
+    Y_temp.data = (double*)calloc(Y_temp.dim1 * Y_temp.dim2, sizeof(double));
+
+    if(X_temp.data == NULL || Y_temp.data == NULL) {
+        fprintf(stderr, "Error: Memory Allocation failed in load data.\n");
         exit(1);
     }
-
-    // Allocate memory for Y
-    Y->data = (double*)calloc(NUM_SAMPLES * NUM_CLASSES, sizeof(double));
-    if(Y->data == NULL) {
-        fprintf(stderr, "Error: Memory Allocation for Y failed in load data.\n");
-        free(X->data);
-        exit(1);
-    }
-    Y->dim1 = NUM_SAMPLES;
-    Y->dim2 = NUM_CLASSES;
 
     // Open file
     FILE* file = fopen(file_path, "r");
-
-    // Check file was opened succesfully
     if (file == NULL) {
         fprintf(stderr, "Error opening file.\n");
         exit(1);
@@ -494,43 +488,106 @@ void load_iris_data(const char* file_path, matrix* X, matrix* Y) {
 
     // Initialize character array for lines
     char line[1024];
-
     int row = 0;
-    while(fgets(line, sizeof(line), file)) {
-        // Tokenize the lines by comma
+
+    // Load data from the file
+    while(fgets(line, sizeof(line), file) && row < num_batches) {
+        // Tokenize the line by comma
         char* token = strtok(line, ",");
         int col = 0;
 
         // Process the features (first 4 tokens)
         while (token != NULL && col < NUM_FEATURES) {
-            X->data[row * NUM_FEATURES + col] = atof(token);
+            X_temp.data[row * NUM_FEATURES + col] = atof(token);
             token = strtok(NULL, ",");
             col++;
         }
 
         // Process the label (the last token)
         if (token != NULL) {
-            // Remove any newline character if present at the end of the label
-            token = strtok(token, "\n");  // This will trim the newline character
-
+            token = strtok(token, "\n");  // Trim newline character
             // One-hot encode the label
             if (strcmp(token, "Iris-setosa") == 0) {
-                Y->data[row * NUM_CLASSES] = 1.0;
+                Y_temp.data[row * NUM_CLASSES] = 1.0;
             } else if (strcmp(token, "Iris-versicolor") == 0) {
-                Y->data[row * NUM_CLASSES + 1] = 1.0;
+                Y_temp.data[row * NUM_CLASSES + 1] = 1.0;
             } else if (strcmp(token, "Iris-virginica") == 0) {
-                Y->data[row * NUM_CLASSES + 2] = 1.0;
+                Y_temp.data[row * NUM_CLASSES + 2] = 1.0;
             }
         }
 
-        // Increment Row
         row++;
-        if (row >= X->dim1) {
+        if (row >= num_batches) {
             fprintf(stderr, "Error: Too many rows in the dataset\n");
             break;
-        }     
+        }
     }
 
     // Close the file
     fclose(file);
+
+    // Shuffle the data to randomize the training/test split
+    srand(time(NULL));
+    for (int i = 0; i < num_batches; i++) {
+        int j = rand() % num_batches;
+        // Swap rows in X_temp and Y_temp
+        for (int k = 0; k < NUM_FEATURES; k++) {
+            double temp = X_temp.data[i * NUM_FEATURES + k];
+            X_temp.data[i * NUM_FEATURES + k] = X_temp.data[j * NUM_FEATURES + k];
+            X_temp.data[j * NUM_FEATURES + k] = temp;
+        }
+
+        for (int k = 0; k < NUM_CLASSES; k++) {
+            double temp = Y_temp.data[i * NUM_CLASSES + k];
+            Y_temp.data[i * NUM_CLASSES + k] = Y_temp.data[j * NUM_CLASSES + k];
+            Y_temp.data[j * NUM_CLASSES + k] = temp;
+        }
+    }
+
+    // Calculate the split index
+    int train_size = (int)(train_ratio * num_batches);
+    int test_size = num_batches - train_size;
+
+    // Allocate memory for training and testing sets
+    X_train->dim1 = train_size;
+    X_train->dim2 = NUM_FEATURES;
+    Y_train->dim1 = train_size;
+    Y_train->dim2 = NUM_CLASSES;
+    X_test->dim1 = test_size;
+    X_test->dim2 = NUM_FEATURES;
+    Y_test->dim1 = test_size;
+    Y_test->dim2 = NUM_CLASSES;
+
+    X_train->data = (double*)calloc(X_train->dim1 * X_train->dim2, sizeof(double));
+    Y_train->data = (double*)calloc(Y_train->dim1 * Y_train->dim2, sizeof(double));
+    X_test->data = (double*)calloc(X_test->dim1 * X_test->dim2, sizeof(double));
+    Y_test->data = (double*)calloc(Y_test->dim1 * Y_test->dim2, sizeof(double));
+
+    if (X_train->data == NULL || Y_train->data == NULL || X_test->data == NULL || Y_test->data == NULL) {
+        fprintf(stderr, "Error: Memory Allocation failed for training or testing data.\n");
+        exit(1);
+    }
+
+    // Copy data to training and testing sets
+    for (int i = 0; i < train_size; i++) {
+        for (int j = 0; j < NUM_FEATURES; j++) {
+            X_train->data[i * NUM_FEATURES + j] = X_temp.data[i * NUM_FEATURES + j];
+        }
+        for (int j = 0; j < NUM_CLASSES; j++) {
+            Y_train->data[i * NUM_CLASSES + j] = Y_temp.data[i * NUM_CLASSES + j];
+        }
+    }
+
+    for (int i = 0; i < test_size; i++) {
+        for (int j = 0; j < NUM_FEATURES; j++) {
+            X_test->data[i * NUM_FEATURES + j] = X_temp.data[(train_size + i) * NUM_FEATURES + j];
+        }
+        for (int j = 0; j < NUM_CLASSES; j++) {
+            Y_test->data[i * NUM_CLASSES + j] = Y_temp.data[(train_size + i) * NUM_CLASSES + j];
+        }
+    }
+
+    // Free temporary arrays
+    free(X_temp.data);
+    free(Y_temp.data);
 }

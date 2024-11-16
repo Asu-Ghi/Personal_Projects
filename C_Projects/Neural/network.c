@@ -6,18 +6,12 @@
 Initializes the neural network
 */
 NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epochs, int* num_neurons_in_layer, double learning_rate,
-                                    ActivationType activation) {
+                                   ActivationType activation, int num_features) {
 
     // Allocate memory for the network
     NeuralNetwork* n_network = (NeuralNetwork*)malloc(sizeof(NeuralNetwork));
 
-    // Check Memory Allocation
-    if (n_network == NULL) {
-        fprintf(stderr, "Error: Memory allocation failed for Neural Network Architecture.\n");
-        exit(1);
-    }
-
-    // Initialize the network
+    // Initialize network parameters
     n_network->num_layers = num_layers;
     n_network->batch_size = batch_size;
     n_network->learning_rate = learning_rate;
@@ -25,66 +19,26 @@ NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epoch
     n_network->activation = activation;
     n_network->num_neurons_in_layer = num_neurons_in_layer;
 
-    // Allocate memory for loss history
+    // Allocate memory for loss history and layers
     n_network->loss_history = (double*) calloc(n_network->num_epochs, sizeof(double));
-
-    // Check memory allocation for loss history
-    if (n_network->loss_history == NULL) {
-        fprintf(stderr, "Error: Memory allocation failed for Neural Networks loss history.\n");
-        free(n_network);
-        exit(1);   
-    }
-
-    // Allocate and check memory for layers
     n_network->layers = (layer_dense**) malloc(n_network->num_layers * sizeof(layer_dense*));
 
-    if (n_network->layers == NULL) {
-        fprintf(stderr, "Error: Memory allocation failed for layers in Neural Network.\n");
-        exit(1);
-    }
-
-    // Allocate memory for invidual layers
-
-    // Allocate and check memory for first layer
-    n_network->layers[0] = init_layer(n_network->batch_size, n_network->num_neurons_in_layer[0], 
-                                    n_network->activation, n_network->batch_size);
-
-    if (n_network->layers[0] == NULL) {
-        fprintf(stderr, "Error: Memory allocation failed for the first layer.\n");
-        free_layer(n_network->layers[0]);
-    }
+    // Allocate memory for the first layer with `num_features`
+    n_network->layers[0] = init_layer(num_features, n_network->num_neurons_in_layer[0], n_network->activation, n_network->batch_size);
 
     // Allocate memory for hidden layers
     for (int i = 1; i < n_network->num_layers - 1; i++) {
         n_network->layers[i] = init_layer(n_network->layers[i-1]->num_neurons, n_network->num_neurons_in_layer[i], 
-                                    n_network->activation, n_network->batch_size);
-        // Check memory allocation
-        if (n_network->layers[i] == NULL) {
-            fprintf(stderr, "Error: Memory allocation failed for the %dth layer.\n", i);
-            // Free all previous layers
-            for (int j = 1; j < i; j++) {
-                free_layer(n_network->layers[j]);
-            }
-            // Free current layer
-            free_layer(n_network->layers[i]);
-            // Exit program
-            exit(1);
-        }
+                                          n_network->activation, n_network->batch_size);
     }
 
-    // Allocate and check memory for last layer
-    n_network->layers[num_layers-1] = init_layer(n_network->layers[num_layers-2]->num_neurons, n_network->num_neurons_in_layer[num_layers-1], 
-                                    SOFTMAX, n_network->batch_size);
+    // Allocate memory for the output layer
+    n_network->layers[num_layers - 1] = init_layer(n_network->layers[num_layers - 2]->num_neurons, n_network->num_neurons_in_layer[num_layers - 1], 
+                                                   SOFTMAX, n_network->batch_size);
 
-    if (n_network->layers[num_layers-1] == NULL) {
-        fprintf(stderr, "Error: Memory allocation failed for the last layer.\n");
-        free_layer(n_network->layers[num_layers-1]);
-        exit(1);
-    }
-
-    // Return the neural network pointer
-    return(n_network);
+    return n_network;
 }
+
 
 /*
 Displays Neural Net Information
@@ -154,14 +108,23 @@ void train_nn(NeuralNetwork* network, matrix* X, matrix* Y) {
 
         // Step 2: Calculate Loss and Accuracy
         printf("Arrived at accuracy.\n");
+        printf("Y dim %d x %d\n", Y->dim1, Y->dim2);
+        printf("Final Layer dim %d x %d\n", network->layers[network->num_layers-1]->post_activation_output->dim1,network->layers[network->num_layers-1]->post_activation_output->dim2);
         double accuracy = calculate_accuracy(Y, network->layers[network->num_layers-1], ONE_HOT);
-        double loss = loss_categorical_cross_entropy(Y, network->layers[network->num_layers], ONE_HOT);
+        matrix* loss_for_examples = loss_categorical_cross_entropy(Y, network->layers[network->num_layers-1], ONE_HOT);
+
+        // calculate batch loss
+        double batch_loss = 0.0;
+        for (int i = 0; i < network->batch_size; i++) {
+            batch_loss+= loss_for_examples->data[i];
+        }
+        batch_loss = batch_loss/network->batch_size;
 
         // Add loss to the loss history
-        network->loss_history[epoch] = loss;
+        network->loss_history[epoch] = batch_loss;
 
         // Print training data
-        printf("Epoch %d: Loss = %f, Accuracy = %f\n", epoch, loss, accuracy);
+        printf("Epoch %d: Loss = %f, Accuracy = %f\n", epoch, batch_loss, accuracy);
 
         // Step 3: Backward Pass
         printf("Arrived at backwards pass.\n");
@@ -171,4 +134,38 @@ void train_nn(NeuralNetwork* network, matrix* X, matrix* Y) {
         printf("Arrived at update weights.\n");
         update_parameters(network);
     }
+}
+
+/*
+Predict on the network
+*/
+// Function to predict a class label for new data (for classification)
+void predict(NeuralNetwork* network, matrix* input_data) {
+    // Check if the input data dimensions match the expected input size
+    if (input_data->dim2 != network->layers[0]->num_inputs) {
+        printf("Error: Input data dimension does not match network input size.\n");
+        return;
+    }
+
+    // Perform a forward pass through the network for prediction
+    forward_pass_nn(network, input_data);
+
+    // After the forward pass, output should contain the network's predictions
+    matrix* output = network->layers[network->num_layers - 1]->post_activation_output;
+
+    // Apply softmax to the output layer to interpret the logits as probabilities
+    forward_softMax(output);
+
+    // Find the index of the class with the highest probability
+    int predicted_class = 0;
+    double max_prob = output->data[0];
+    for (int i = 1; i < output->dim2; i++) {
+        if (output->data[i] > max_prob) {
+            max_prob = output->data[i];
+            predicted_class = i;
+        }
+    }
+
+    // Print the predicted class
+    printf("Predicted class: %d (Probability: %f)\n", predicted_class, max_prob);
 }

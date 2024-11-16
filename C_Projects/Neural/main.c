@@ -1,10 +1,11 @@
 #include "network.h"
+#include "test_functions.h"
 
 /*
 Main Method
 */
 
-void test_method(){
+void backup(){
     // init layers
     layer_dense* layer_1 = init_layer(3, 5,  RELU, 4);
     layer_1->id = "1";
@@ -62,20 +63,20 @@ void test_method(){
     sparse_vector.dim2 = 1;
 
     // calculate loss from softmax
-    double losses_one_hot = loss_categorical_cross_entropy( &one_hot_vector, layer_4, ONE_HOT);
-    double losses_sparse = loss_categorical_cross_entropy(&sparse_vector, layer_4, SPARSE);
+    matrix* losses_one_hot = loss_categorical_cross_entropy( &one_hot_vector, layer_4, ONE_HOT);
+    matrix* losses_sparse = loss_categorical_cross_entropy(&sparse_vector, layer_4, SPARSE);
 
     // // calculate  and print accuracy of the batch
-    double accuracy_one_hot = calculate_accuracy(&one_hot_vector, layer_4, ONE_HOT);
-    double accuracy_sparse = calculate_accuracy(&sparse_vector, layer_4, SPARSE);
-    printf("------------ACCURACY-----------\n");
-    printf("One_Hot: %f\n", accuracy_one_hot);
-    printf("Sparse: %f\n", accuracy_sparse);
-    printf("------------LOSS-----------\n");
-    printf("One_Hot:\n");
-    printf("%f\n",losses_one_hot);
-    printf("SPARSE:\n");
-    printf("%f\n",losses_sparse);
+    // double accuracy_one_hot = calculate_accuracy(&one_hot_vector, layer_4, ONE_HOT);
+    // double accuracy_sparse = calculate_accuracy(&sparse_vector, layer_4, SPARSE);
+    // printf("------------ACCURACY-----------\n");
+    // printf("One_Hot: %f\n", accuracy_one_hot);
+    // printf("Sparse: %f\n", accuracy_sparse);
+    // printf("------------LOSS-----------\n");
+    // printf("One_Hot:\n");
+    // printf("%f\n",losses_one_hot);
+    // printf("SPARSE:\n");
+    // printf("%f\n",losses_sparse);
 
 
 
@@ -114,36 +115,15 @@ void test_method(){
 
 }
 
+#define NUM_FEATURES 4
+#define NUM_CLASSES 3
 int main(int argc, char** argv) {
-    
-    // check if inputs exist
-    if (argc < 5) {
-        printf("Command usage %s num_layers, batch_size, num_epochs, learning_rate", argv[0]);
-        exit(1);
-    }
-    // define inputs
-    int num_layers = 5;
-    int batch_size = atoi(argv[2]);
-    int num_epochs = atoi(argv[3]);
-    double learning_rate = atof(argv[4]);
+    // Check command-line arguments (same as before)
+    // if (argc < 5) {
+    //     printf("Command usage %s num_layers, batch_size, num_epochs, learning_rate", argv[0]);
+    //     exit(1);
+    // }
 
-    // define number of neurons in each layer
-    int num_neurons_in_layer[5] = {128, 64, 32, 16, 4};
-
-
-    // init neural net
-    // 150 samaples with 4 features (so mult by 4)
-    NeuralNetwork* network = init_neural_network(num_layers, batch_size * 4, num_epochs, num_neurons_in_layer,
-                        learning_rate, RELU);
-
-    // Print neural net info
-    print_nn_info(network);
-
-    // Load Data
-    matrix X;
-    matrix Y;
-    load_iris_data("iris/iris.csv", &X, &Y);
-
-    // Train neural net
-    train_nn(network, &X, &Y);
+    // test_all_methods();
+    test_loss_categorical();
 }
