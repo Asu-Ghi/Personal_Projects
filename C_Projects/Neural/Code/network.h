@@ -18,9 +18,14 @@ typedef struct {
     int* num_neurons_in_layer;
     int num_layers;
     int batch_size;
+    int num_features;
     double learning_rate;
+    double decay_rate;
     int num_epochs;
+    int current_epoch;
     double* loss_history;
+    bool momentum;
+    double beta;
     ActivationType activation;
 } NeuralNetwork;
 

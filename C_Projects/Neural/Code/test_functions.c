@@ -719,9 +719,9 @@ void test_update_params_sgd() {
         backward_reLu(layer_two->dinputs, layer_one);
 
         // Update parameters for the layers
-        update_params_sgd(layer_one, learning_rate);
-        update_params_sgd(layer_two, learning_rate);
-        update_params_sgd(layer_three, learning_rate);
+        update_params_sgd(layer_one, &learning_rate, i, 0.0001);
+        update_params_sgd(layer_two, &learning_rate, i, .0001);
+        update_params_sgd(layer_three, &learning_rate, i, .0001);
     }
 
     printf("//////////////////////////////////////////////////////\n");

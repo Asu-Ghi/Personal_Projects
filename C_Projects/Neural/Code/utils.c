@@ -4,6 +4,8 @@
 #include <string.h>
 #include <math.h>
 #include <float.h>
+#include <stdbool.h>
+
 
 //////////////////////////////////////////////////// Linear Algebra Methods //////////////////////////////////////////////////////////////
 
@@ -183,12 +185,11 @@ layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activati
     // randomize weights
     srand(time(NULL));  // Seed random number with current time
 
-    double min = -1, max = 1;
     //  n_inputs x n_neurons matrix
     for (int i = 0; i < num_neurons * num_inputs; i++){
-        // random double between -1 and 1 scaled down by 0.05
-        layer_->weights->data[i] = 1.5 * (min + (max - min) * ((double)rand() / RAND_MAX));
-
+        // Random between -1 and 1 scaled by sqrt(1/n)
+        // He initialization
+        layer_->weights->data[i] = sqrt(1.0 / num_inputs) * ((double)rand() / RAND_MAX * 2.0 - 1.0);  
     }
 
     // initialize other matrix objects, also allocate memory
@@ -206,6 +207,30 @@ layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activati
 
     // initialize activation function for the layer
     layer_->activation = activation;
+
+    // Initialize velocity for weights
+    layer_->w_velocity = (matrix*)malloc(sizeof(matrix));
+    layer_->w_velocity->dim1 = layer_->num_inputs;
+    layer_->w_velocity->dim2 = layer_->num_neurons;
+    layer_->w_velocity->data = (double*)calloc(layer_->num_neurons * layer_->num_inputs, sizeof(double));
+
+    // Check memory
+    if (layer_->w_velocity == NULL || layer_->w_velocity->data == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed for layer weight velocity.\n");
+        free_layer(layer_);
+    } 
+
+    // Initialize velocity for biases
+    layer_->b_velocity = (matrix*)malloc(sizeof(matrix));
+    layer_->b_velocity->dim1 = layer_->num_neurons;
+    layer_->b_velocity->dim2 = 1;
+    layer_->b_velocity->data = (double*)calloc(layer_->num_neurons * layer_->num_inputs, sizeof(double));
+
+    // Check memory
+    if (layer_->b_velocity == NULL || layer_->b_velocity->data == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed for layer bias velocity.\n");
+        free_layer(layer_);
+    } 
 
     // return layer dense object
     return layer_;
@@ -226,6 +251,10 @@ void free_layer(layer_dense* layer) {
     free(layer->pre_activation_output);
     free(layer->post_activation_output->data);
     free(layer->post_activation_output);
+    free(layer->w_velocity->data);
+    free(layer->w_velocity);
+    free(layer->b_velocity->data);
+    free(layer->b_velocity);
     free(layer);
 }
 
@@ -404,25 +433,59 @@ matrix* loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_laye
     return(losses);
 }
 
-void update_params_sgd(layer_dense* layer, double learning_rate) {
+void update_params_sgd(layer_dense* layer, double* learning_rate, int current_epoch, double decay_rate) {
+
+    // Decay the learning rate after each epoch
+    // *learning_rate = *learning_rate / (1 + decay_rate * current_epoch);
+    // fmax ensures min learning rate of 0.000001
+    *learning_rate = fmax(*learning_rate * exp(-decay_rate * current_epoch), 0.000001);
 
     // Update weights
     for (int i = 0; i < layer->num_neurons; i++) {
         for (int j = 0; j < layer->num_inputs; j++) {
             // W = W - learning_rate * dL/dW
-            layer->weights->data[i * layer->num_inputs + j] -= learning_rate * layer->dweights->data[i * layer->num_inputs + j];
+            layer->weights->data[i * layer->num_inputs + j] -= *learning_rate * layer->dweights->data[i * layer->num_inputs + j];
+            
         }
     }
 
     // Update biases
     for(int i = 0; i < layer->num_neurons; i++) {
         // b = b - learning_rate * dL/dB
-        layer->biases->data[i] -= learning_rate * layer->dbiases->data[i];
+        layer->biases->data[i] -= *learning_rate * layer->dbiases->data[i];
+    }
+}
+
+void update_params_sgd_momentum(layer_dense* layer, double* learning_rate, int current_epoch, double decay_rate, double beta) {
+
+    // Decay the learning rate after each epoch
+    // *learning_rate = *learning_rate / (1 + decay_rate * current_epoch);
+    // fmax ensures min learning rate of 0.000001
+    *learning_rate = fmax(*learning_rate * exp(-decay_rate * current_epoch), 0.000001);
+    
+    // Update weights
+    for (int i = 0; i < layer->num_neurons; i++) {
+        for (int j = 0; j < layer->num_inputs; j++) {
+            // v_t = beta * v_(t-1) + (1 - beta) * dL/dW
+            layer->w_velocity->data[i*layer->num_inputs+j] = beta * layer->w_velocity->data[i*layer->num_inputs+j] 
+                                                            + (1-beta) * layer->dweights->data[i*layer->num_inputs+j];
+            // W = W - learning_rate * v_t
+            layer->weights->data[i*layer->num_inputs+j] -= *learning_rate * layer->w_velocity->data[i*layer->num_inputs+j];
+            
+        }
+    }
+
+    // Update biases
+    for(int i = 0; i < layer->num_neurons; i++) {
+        // v_t = beta * v_(t-1) + (1 - beta) * dL/dB
+        layer->b_velocity->data[i] = beta * layer->b_velocity->data[i] + (1 - beta) * layer->dbiases->data[i];
+        // b = b - learning_rate * v_t
+        layer->biases->data[i] -= *learning_rate * layer->b_velocity->data[i];
     }
 }
 
 void update_params_adam() {
-    
+
 }
 
 #define IRIS_NUM_FEATURES 4
@@ -515,7 +578,6 @@ void load_iris_data(char* file_path, matrix* X_train, matrix* Y_train, matrix* X
     // Allocate memory for training and testing sets
     X_train->dim1 = train_size;
     X_train->dim2 = IRIS_NUM_FEATURES;
-    printf("X_train dim (%d x %d)\n", train_size, IRIS_NUM_FEATURES);
 
     Y_train->dim1 = train_size;
     Y_train->dim2 = IRIS_NUM_CLASSES;

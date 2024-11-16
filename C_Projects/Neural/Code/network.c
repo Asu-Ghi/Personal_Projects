@@ -10,10 +10,15 @@ NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epoch
     // Initialize network parameters
     n_network->num_layers = num_layers;
     n_network->batch_size = batch_size;
+    n_network->num_features = num_batch_features;
     n_network->learning_rate = learning_rate;
+    n_network->decay_rate = 0.0; // initialize to 0
     n_network->num_epochs = num_epochs;
     n_network->activation = activation;
     n_network->num_neurons_in_layer = num_neurons_in_layer;
+    n_network->current_epoch = 0;
+    n_network->momentum = false; // initializes to false
+    n_network->beta = 0.8; // initializes to 0.8
 
     // Allocate memory for loss history and layers
     n_network->loss_history = (double*) calloc(n_network->num_epochs, sizeof(double));
@@ -46,10 +51,24 @@ void free_neural_network(NeuralNetwork* network) {
 
 void print_nn_info(NeuralNetwork* network) {
     // Print network constraints
+    printf("#############################################\n");
+    printf("#############################################\n");
     printf("NUMBER OF LAYERS: %d\n", network->num_layers);
     printf("BATCH SIZE: %d\n", network->batch_size);
+    printf("NUMBER OF INPUT FEATURES: %d\n",network->num_features);
     printf("NUMBER OF EPOCHS: %d\n", network->num_epochs);
     printf("LEARNING RATE: %f\n", network->learning_rate);
+    printf("DECAY RATE: %f\n", network->decay_rate);
+
+    if (network->momentum) {
+        printf("USING MOMENTUM; BETA = %f\n", network->beta);
+    }
+    else {
+        printf("NOT USING MOMENTUM\n");
+    }
+    printf("#############################################\n");
+    printf("#############################################\n");
+
 }
 
 void forward_pass_nn(NeuralNetwork* network, matrix* inputs) {
@@ -82,7 +101,16 @@ void update_parameters(NeuralNetwork* network) {
     // Loop through the first and all hidden layers
     for (int i = 0; i < network->num_layers - 1; i++) {
         // Update weights and biases for each layer(currently uses SGD)
-        update_params_sgd(network->layers[i], network->learning_rate);
+
+        // If using momentum
+        if (network->momentum) {
+            update_params_sgd_momentum(network->layers[i], &network->learning_rate, network->current_epoch, network->decay_rate,
+                                        network->beta);
+        }
+        // If not using momentum
+        else {
+            update_params_sgd(network->layers[i], &network->learning_rate, network->current_epoch, network->decay_rate);
+        }
     }
 }
 
@@ -108,13 +136,16 @@ void train_nn(NeuralNetwork* network, matrix* X, matrix* Y) {
         network->loss_history[epoch] = batch_loss;
 
         // Print training data
-        printf("Epoch %d: Loss = %f, Accuracy = %f\n", epoch, batch_loss, accuracy);
+        printf("Epoch %d: Loss = %f, Accuracy = %f, LR = %f \n", epoch, batch_loss, accuracy, network->learning_rate);
 
         // Step 3: Backward Pass
         backward_pass_nn(network, Y);
 
         // Step 4: Update Weights
         update_parameters(network);
+
+        // Step 5: Update current epoch (for learning rate decay)
+        network->current_epoch += 1;
     }
 }
 
