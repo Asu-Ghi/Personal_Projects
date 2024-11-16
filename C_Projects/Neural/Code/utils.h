@@ -8,6 +8,7 @@
 #include <math.h>
 #include <time.h>
 #include <float.h> 
+#include <stdbool.h>
 //////////////////////////////////////////////////// Data Structures //////////////////////////////////////////////////////////////
 
 /*
@@ -47,6 +48,8 @@ typedef struct {
     matrix* dweights;
     matrix* dbiases;
     matrix* dinputs;
+    matrix* w_velocity; // used to calculate momentums for weight
+    matrix* b_velocity; // used to calculate momentums for bias
     ActivationType activation;
 } layer_dense;
 
@@ -58,6 +61,18 @@ typedef enum {
     ONE_HOT,
     SPARSE
 } ClassLabelEncoding;
+
+/*
+Optimization function enum structure
+Enum to store what optimization function to use.
+*/
+typedef enum {
+    SGD,
+    SGD_MOMENTUM,
+    ADA_GRAD,
+    RMS_PROP,
+    ADAM
+}OptimizationType;
 
 //////////////////////////////////////////////////// Linear Algebra Methods //////////////////////////////////////////////////////////////
 
@@ -133,7 +148,14 @@ matrix* loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_laye
 SGD Optimization
 ADD INFO HERE
 */
-void update_params_sgd(layer_dense* layer, double learning_rate);
+void update_params_sgd(layer_dense* layer, double* learning_rate, int current_epoch, double decay_rate);
+
+/*
+SGD Optimization with momentum
+ADD INFO HERE
+*/
+void update_params_sgd_momentum(layer_dense* layer, double* learning_rate, int current_epoch, double decay_rate, double beta);
+
 
 /*
 Adam Optimization
