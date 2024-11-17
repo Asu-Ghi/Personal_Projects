@@ -5,6 +5,192 @@
 #include <math.h>
 #include <float.h>
 #include <stdbool.h>
+#define IRIS_NUM_FEATURES 4
+#define IRIS_NUM_CLASSES 3
+
+/////////////////////////////////////////////////////// Misc. Methods /////////////////////////////////////////////////////////////////
+
+void load_iris_data(char* file_path, matrix* X_train, matrix* Y_train, matrix* X_test, matrix* Y_test, int num_batches, double train_ratio) {
+    // Allocate memory for temporary X and Y
+    matrix X_temp, Y_temp;
+    X_temp.dim1 = num_batches;
+    X_temp.dim2 = IRIS_NUM_FEATURES;
+    Y_temp.dim1 = num_batches;
+    Y_temp.dim2 = IRIS_NUM_CLASSES;
+
+    X_temp.data = (double*)calloc(X_temp.dim1 * X_temp.dim2, sizeof(double));
+    Y_temp.data = (double*)calloc(Y_temp.dim1 * Y_temp.dim2, sizeof(double));
+
+    if(X_temp.data == NULL || Y_temp.data == NULL) {
+        fprintf(stderr, "Error: Memory Allocation failed in load data.\n");
+        exit(1);
+    }
+
+    // Open file
+    FILE* file = fopen(file_path, "r");
+    if (file == NULL) {
+        fprintf(stderr, "Error opening file.\n");
+        exit(1);
+    }
+
+    // Initialize character array for lines
+    char line[1024];
+    int row = 0;
+
+    // Load data from the file
+    while(fgets(line, sizeof(line), file) && row < num_batches) {
+        // Tokenize the line by comma
+        char* token = strtok(line, ",");
+        int col = 0;
+
+        // Process the features (first 4 tokens)
+        while (token != NULL && col < IRIS_NUM_FEATURES) {
+            X_temp.data[row * IRIS_NUM_FEATURES + col] = atof(token);
+            token = strtok(NULL, ",");
+            col++;
+        }
+
+        // Process the label (the last token)
+        if (token != NULL) {
+            token = strtok(token, "\n");  // Trim newline character
+            // One-hot encode the label
+            if (strcmp(token, "Iris-setosa") == 0) {
+                Y_temp.data[row * IRIS_NUM_CLASSES] = 1.0;
+            } else if (strcmp(token, "Iris-versicolor") == 0) {
+                Y_temp.data[row * IRIS_NUM_CLASSES + 1] = 1.0;
+            } else if (strcmp(token, "Iris-virginica") == 0) {
+                Y_temp.data[row * IRIS_NUM_CLASSES + 2] = 1.0;
+            }
+        }
+
+        row++;
+        if (row > num_batches) {
+            fprintf(stderr, "Error: Too many rows in the dataset\n");
+            break;
+        }
+    }
+
+    // Close the file
+    fclose(file);
+
+    // Shuffle the data to randomize the training/test split
+    srand(time(NULL));
+    for (int i = 0; i < num_batches; i++) {
+        int j = rand() % num_batches;
+        // Swap rows in X_temp and Y_temp
+        for (int k = 0; k < IRIS_NUM_FEATURES; k++) {
+            double temp = X_temp.data[i * IRIS_NUM_FEATURES + k];
+            X_temp.data[i * IRIS_NUM_FEATURES + k] = X_temp.data[j * IRIS_NUM_FEATURES + k];
+            X_temp.data[j * IRIS_NUM_FEATURES + k] = temp;
+        }
+
+        for (int k = 0; k < IRIS_NUM_CLASSES; k++) {
+            double temp = Y_temp.data[i * IRIS_NUM_CLASSES + k];
+            Y_temp.data[i * IRIS_NUM_CLASSES + k] = Y_temp.data[j * IRIS_NUM_CLASSES + k];
+            Y_temp.data[j * IRIS_NUM_CLASSES + k] = temp;
+        }
+    }
+
+    // Calculate the split index
+    int train_size = (int)(train_ratio * num_batches);
+    int test_size = num_batches - train_size;
+
+    // Allocate memory for training and testing sets
+    X_train->dim1 = train_size;
+    X_train->dim2 = IRIS_NUM_FEATURES;
+
+    Y_train->dim1 = train_size;
+    Y_train->dim2 = IRIS_NUM_CLASSES;
+    X_test->dim1 = test_size;
+    X_test->dim2 = IRIS_NUM_FEATURES;
+    Y_test->dim1 = test_size;
+    Y_test->dim2 = IRIS_NUM_CLASSES;
+
+    X_train->data = (double*)calloc(X_train->dim1 * X_train->dim2, sizeof(double));
+    Y_train->data = (double*)calloc(Y_train->dim1 * Y_train->dim2, sizeof(double));
+    X_test->data = (double*)calloc(X_test->dim1 * X_test->dim2, sizeof(double));
+    Y_test->data = (double*)calloc(Y_test->dim1 * Y_test->dim2, sizeof(double));
+
+    if (X_train->data == NULL || Y_train->data == NULL || X_test->data == NULL || Y_test->data == NULL) {
+        fprintf(stderr, "Error: Memory Allocation failed for training or testing data.\n");
+        exit(1);
+    }
+
+    // Copy data to training and testing sets
+    for (int i = 0; i < train_size; i++) {
+        for (int j = 0; j < IRIS_NUM_FEATURES; j++) {
+            X_train->data[i * IRIS_NUM_FEATURES + j] = X_temp.data[i * IRIS_NUM_FEATURES + j];
+        }
+        for (int j = 0; j < IRIS_NUM_CLASSES; j++) {
+            Y_train->data[i * IRIS_NUM_CLASSES + j] = Y_temp.data[i * IRIS_NUM_CLASSES + j];
+        }
+    }
+
+    for (int i = 0; i < test_size; i++) {
+        for (int j = 0; j < IRIS_NUM_FEATURES; j++) {
+            X_test->data[i * IRIS_NUM_FEATURES + j] = X_temp.data[(train_size + i) * IRIS_NUM_FEATURES + j];
+        }
+        for (int j = 0; j < IRIS_NUM_CLASSES; j++) {
+            Y_test->data[i * IRIS_NUM_CLASSES + j] = Y_temp.data[(train_size + i) * IRIS_NUM_CLASSES + j];
+        }
+    }
+
+    // Free temporary arrays
+    free(X_temp.data);
+    free(Y_temp.data);
+}
+
+void load_data(const char* filename, double* data, int rows, int cols) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        fprintf(stderr, "Error: Could not open file %s\n", filename);
+        exit(1);
+    }
+
+    // Read data from CSV and store it in the array
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            fscanf(file, "%lf,", &data[i * cols + j]);  // Read each value
+        }
+        fscanf(file, "\n");  // Move to the next line
+    }
+
+    fclose(file);
+}
+
+void load_labels(const char *filename, int *labels, int size) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        fprintf(stderr, "Error opening file: %s\n", filename);
+        exit(1);
+    }
+
+    for (int i = 0; i < size; i++) {
+        fscanf(file, "%d,", &labels[i]);
+    }
+    fclose(file);
+}
+
+char* optimization_type_to_string(OptimizationType type) {
+    switch (type) {
+        case SGD: return "SGD";
+        case SGD_MOMENTUM: return "SGD_MOMENTUM";
+        case ADA_GRAD: return "ADA_GRAD";
+        case RMS_PROP: return "RMS_PROP";
+        case ADAM: return "ADAM";
+        default: return "UNKNOWN";
+    }
+}
+
+char* activation_type_to_string(ActivationType type) {
+    switch (type) {
+        case RELU: return "RELU";
+        case SOFTMAX: return "SOFTMAX";
+        case SIGMOID: return "SIGMOID";
+        case TANH: return "TANH";
+        default: return "UNKNOWN";
+    }
+}
 
 
 //////////////////////////////////////////////////// Linear Algebra Methods //////////////////////////////////////////////////////////////
@@ -101,7 +287,7 @@ matrix* matrix_mult(matrix* w, matrix* v) {
 
 //////////////////////////////////////////////////// Network Methods //////////////////////////////////////////////////////////////////
 
-layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activation, int batch_size) {
+layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activation, OptimizationType optimization, int batch_size) {
 
     // initialize a layer dense object
     layer_dense* layer_ = malloc(sizeof(layer_dense));
@@ -208,29 +394,73 @@ layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activati
     // initialize activation function for the layer
     layer_->activation = activation;
 
+    // initialize optimization function for the layer
+    layer_->optimization = optimization;
+
     // Initialize velocity for weights
     layer_->w_velocity = (matrix*)malloc(sizeof(matrix));
-    layer_->w_velocity->dim1 = layer_->num_inputs;
-    layer_->w_velocity->dim2 = layer_->num_neurons;
-    layer_->w_velocity->data = (double*)calloc(layer_->num_neurons * layer_->num_inputs, sizeof(double));
+    layer_->w_velocity->dim1 = layer_->weights->dim1;
+    layer_->w_velocity->dim2 = layer_->weights->dim2;
+    layer_->w_velocity->data = (double*)calloc(layer_->w_velocity->dim1 * layer_->w_velocity->dim2, sizeof(double));
 
     // Check memory
-    if (layer_->w_velocity == NULL || layer_->w_velocity->data == NULL) {
+    if (layer_->w_velocity->data == NULL) {
         fprintf(stderr, "Error: Memory allocation failed for layer weight velocity.\n");
         free_layer(layer_);
+        exit(1);
     } 
 
     // Initialize velocity for biases
     layer_->b_velocity = (matrix*)malloc(sizeof(matrix));
-    layer_->b_velocity->dim1 = layer_->num_neurons;
-    layer_->b_velocity->dim2 = 1;
-    layer_->b_velocity->data = (double*)calloc(layer_->num_neurons * layer_->num_inputs, sizeof(double));
+    layer_->b_velocity->dim1 = layer_->biases->dim1;
+    layer_->b_velocity->dim2 = layer_->biases->dim2;
+    layer_->b_velocity->data = (double*)calloc(layer_->b_velocity->dim1 * layer_->b_velocity->dim2, sizeof(double));
 
     // Check memory
-    if (layer_->b_velocity == NULL || layer_->b_velocity->data == NULL) {
+    if (layer_->b_velocity->data == NULL) {
         fprintf(stderr, "Error: Memory allocation failed for layer bias velocity.\n");
         free_layer(layer_);
+        exit(1);
     } 
+
+    // Initialize cache weights and biases for the layer
+    layer_->cache_bias = malloc(sizeof(matrix));
+    layer_->cache_bias->dim1 = layer_->biases->dim1;
+    layer_->cache_bias->dim2 = layer_->biases->dim2;
+    layer_->cache_bias->data = (double*) calloc(layer_->cache_bias->dim1 * layer_->cache_bias->dim2, sizeof(double));
+
+    layer_->cache_weights = malloc(sizeof(matrix));
+    layer_->cache_weights->dim1 = layer_->weights->dim1;
+    layer_->cache_weights->dim2 = layer_->weights->dim2;
+    layer_->cache_weights->data = (double*) calloc(layer_->cache_weights->dim1 * layer_->cache_weights->dim2, sizeof(double));
+    
+    // Check memory
+    if (layer_->cache_bias == NULL || layer_->cache_bias->data == NULL) {
+        fprintf(stderr, "Error: Memory allocation failure with cache_bias in init layer.\n");
+        free_layer(layer_);
+        exit(1);
+    }
+
+    if (layer_->cache_weights == NULL || layer_->cache_weights->data == NULL) {
+        fprintf(stderr, "Error: Memory allocation failure with cache_weights in init layer.\n");
+        free_layer(layer_);
+        exit(1);
+    }
+
+    // Check dimensions
+    if (layer_->cache_weights->dim1 != layer_->dweights->dim1 || layer_->cache_weights->dim2 != layer_->dweights->dim2) {
+        fprintf(stderr, "Error: Dimensionality mismatch between cache weights and dweights in update params adagrad.\n");
+        free_layer(layer_);
+        exit(1);
+    }
+
+    // Check dimensions
+    if (layer_->cache_bias->dim1 != layer_->dbiases->dim1 || layer_->cache_bias->dim2 != layer_->dbiases->dim2) {
+        fprintf(stderr, "Error: Dimensionality mismatch between cache bias and dbiases in update params adagrad.\n");
+        free(layer_->cache_bias->data);
+        free(layer_->cache_bias);
+        exit(1);
+    }
 
     // return layer dense object
     return layer_;
@@ -255,6 +485,10 @@ void free_layer(layer_dense* layer) {
     free(layer->w_velocity);
     free(layer->b_velocity->data);
     free(layer->b_velocity);
+    free(layer->cache_weights->data);
+    free(layer->cache_weights);
+    free(layer->cache_bias->data);
+    free(layer->cache_bias);
     free(layer);
 }
 
@@ -484,138 +718,129 @@ void update_params_sgd_momentum(layer_dense* layer, double* learning_rate, int c
     }
 }
 
-void update_params_adam() {
+void update_params_adagrad(layer_dense* layer, double* learning_rate, double decay_rate, double epsilon) {
+    // WEIGHTS
 
+    // Square every element in dweights, add to cache_weights
+    for (int i = 0; i < layer->cache_weights->dim1 * layer->cache_weights->dim2; i++) {
+        // Calculate cache
+        layer->cache_weights->data[i] += layer->dweights->data[i] * layer->dweights->data[i];
+
+        layer->weights->data[i] -= *learning_rate * layer->dweights->data[i] / (sqrt(layer->cache_weights->data[i]) + epsilon);
+    }
+
+
+    // BIASES
+
+    // Square every element in dbiases, add to cache_biases
+    for (int i = 0; i < layer->cache_bias->dim1 * layer->cache_bias->dim2; i++) {
+        // Calculate cache
+        layer->cache_bias->data[i] += layer->dbiases->data[i] * layer->dbiases->data[i];
+
+        layer->biases->data[i] -= *learning_rate * layer->dbiases->data[i] / (sqrt(layer->cache_bias->data[i]) + epsilon);
+    }
 }
 
-#define IRIS_NUM_FEATURES 4
-#define IRIS_NUM_CLASSES 3
-void load_iris_data(char* file_path, matrix* X_train, matrix* Y_train, matrix* X_test, matrix* Y_test, int num_batches, double train_ratio) {
-    // Allocate memory for temporary X and Y
-    matrix X_temp, Y_temp;
-    X_temp.dim1 = num_batches;
-    X_temp.dim2 = IRIS_NUM_FEATURES;
-    Y_temp.dim1 = num_batches;
-    Y_temp.dim2 = IRIS_NUM_CLASSES;
+void update_params_rmsprop(layer_dense* layer, double* learning_rate, double decay_rate, double epsilon) {
+    // WEIGHTS
+    for (int i = 0; i < layer->weights->dim1 * layer->weights->dim2; i++) {
+        // Update cache for weights
+        layer->cache_weights->data[i] = decay_rate * layer->cache_weights->data[i] +
+                                                (1.0 - decay_rate) * layer->dweights->data[i] * layer->dweights->data[i];
+        // Update weights
+        layer->weights->data[i] -= *learning_rate * layer->dweights->data[i] /
+                                           (sqrt(layer->cache_weights->data[i]) + epsilon);
+    }
 
-    X_temp.data = (double*)calloc(X_temp.dim1 * X_temp.dim2, sizeof(double));
-    Y_temp.data = (double*)calloc(Y_temp.dim1 * Y_temp.dim2, sizeof(double));
+    // BIASES
+    for (int i = 0; i < layer->biases->dim1 * layer->biases->dim2; i++) {
+        // Update cache for biases
+        layer->cache_bias->data[i] = decay_rate * layer->cache_bias->data[i] +
+                                                (1.0 - decay_rate) * layer->dbiases->data[i] * layer->dbiases->data[i];
+        // Update biases
+        layer->biases->data[i] -= *learning_rate * layer->dbiases->data[i] /
+                                           (sqrt(layer->cache_bias->data[i]) + epsilon);
+    }
+}
 
-    if(X_temp.data == NULL || Y_temp.data == NULL) {
-        fprintf(stderr, "Error: Memory Allocation failed in load data.\n");
+void update_params_adam (layer_dense* layer, double* learning_rate, double decay_rate, double beta_1, double beta_2, double epsilon, int t) {
+    
+    // Check memory allocation for momentums and cache
+    if (layer->w_velocity->data == NULL || layer->b_velocity->data == NULL) {
+        fprintf(stderr, "Error: Momentum data in adam optimizer not initialized.\n");
         exit(1);
     }
 
-    // Open file
-    FILE* file = fopen(file_path, "r");
-    if (file == NULL) {
-        fprintf(stderr, "Error opening file.\n");
+    if (layer->cache_weights->data == NULL || layer->cache_bias->data == NULL) {
+        fprintf(stderr, "Error: Cache data in adam optimizer not initialized. \n");
         exit(1);
     }
 
-    // Initialize character array for lines
-    char line[1024];
-    int row = 0;
-
-    // Load data from the file
-    while(fgets(line, sizeof(line), file) && row < num_batches) {
-        // Tokenize the line by comma
-        char* token = strtok(line, ",");
-        int col = 0;
-
-        // Process the features (first 4 tokens)
-        while (token != NULL && col < IRIS_NUM_FEATURES) {
-            X_temp.data[row * IRIS_NUM_FEATURES + col] = atof(token);
-            token = strtok(NULL, ",");
-            col++;
-        }
-
-        // Process the label (the last token)
-        if (token != NULL) {
-            token = strtok(token, "\n");  // Trim newline character
-            // One-hot encode the label
-            if (strcmp(token, "Iris-setosa") == 0) {
-                Y_temp.data[row * IRIS_NUM_CLASSES] = 1.0;
-            } else if (strcmp(token, "Iris-versicolor") == 0) {
-                Y_temp.data[row * IRIS_NUM_CLASSES + 1] = 1.0;
-            } else if (strcmp(token, "Iris-virginica") == 0) {
-                Y_temp.data[row * IRIS_NUM_CLASSES + 2] = 1.0;
-            }
-        }
-
-        row++;
-        if (row > num_batches) {
-            fprintf(stderr, "Error: Too many rows in the dataset\n");
-            break;
-        }
-    }
-
-    // Close the file
-    fclose(file);
-
-    // Shuffle the data to randomize the training/test split
-    srand(time(NULL));
-    for (int i = 0; i < num_batches; i++) {
-        int j = rand() % num_batches;
-        // Swap rows in X_temp and Y_temp
-        for (int k = 0; k < IRIS_NUM_FEATURES; k++) {
-            double temp = X_temp.data[i * IRIS_NUM_FEATURES + k];
-            X_temp.data[i * IRIS_NUM_FEATURES + k] = X_temp.data[j * IRIS_NUM_FEATURES + k];
-            X_temp.data[j * IRIS_NUM_FEATURES + k] = temp;
-        }
-
-        for (int k = 0; k < IRIS_NUM_CLASSES; k++) {
-            double temp = Y_temp.data[i * IRIS_NUM_CLASSES + k];
-            Y_temp.data[i * IRIS_NUM_CLASSES + k] = Y_temp.data[j * IRIS_NUM_CLASSES + k];
-            Y_temp.data[j * IRIS_NUM_CLASSES + k] = temp;
-        }
-    }
-
-    // Calculate the split index
-    int train_size = (int)(train_ratio * num_batches);
-    int test_size = num_batches - train_size;
-
-    // Allocate memory for training and testing sets
-    X_train->dim1 = train_size;
-    X_train->dim2 = IRIS_NUM_FEATURES;
-
-    Y_train->dim1 = train_size;
-    Y_train->dim2 = IRIS_NUM_CLASSES;
-    X_test->dim1 = test_size;
-    X_test->dim2 = IRIS_NUM_FEATURES;
-    Y_test->dim1 = test_size;
-    Y_test->dim2 = IRIS_NUM_CLASSES;
-
-    X_train->data = (double*)calloc(X_train->dim1 * X_train->dim2, sizeof(double));
-    Y_train->data = (double*)calloc(Y_train->dim1 * Y_train->dim2, sizeof(double));
-    X_test->data = (double*)calloc(X_test->dim1 * X_test->dim2, sizeof(double));
-    Y_test->data = (double*)calloc(Y_test->dim1 * Y_test->dim2, sizeof(double));
-
-    if (X_train->data == NULL || Y_train->data == NULL || X_test->data == NULL || Y_test->data == NULL) {
-        fprintf(stderr, "Error: Memory Allocation failed for training or testing data.\n");
+    // Check Dimensions
+    if (layer->w_velocity->dim1 != layer->dweights->dim1 || layer->w_velocity->dim2 != layer->dweights->dim2) {
+        fprintf(stderr, "Error: w_velocity dimensions do not match dweights.\n");
         exit(1);
     }
 
-    // Copy data to training and testing sets
-    for (int i = 0; i < train_size; i++) {
-        for (int j = 0; j < IRIS_NUM_FEATURES; j++) {
-            X_train->data[i * IRIS_NUM_FEATURES + j] = X_temp.data[i * IRIS_NUM_FEATURES + j];
-        }
-        for (int j = 0; j < IRIS_NUM_CLASSES; j++) {
-            Y_train->data[i * IRIS_NUM_CLASSES + j] = Y_temp.data[i * IRIS_NUM_CLASSES + j];
-        }
+    if (layer->b_velocity->dim1 != layer->dbiases->dim1 || layer->b_velocity->dim2 != layer->dbiases->dim2) {
+        fprintf(stderr, "Error: b_velocity dimensions do not match dbiases.\n");
+        exit(1);
     }
 
-    for (int i = 0; i < test_size; i++) {
-        for (int j = 0; j < IRIS_NUM_FEATURES; j++) {
-            X_test->data[i * IRIS_NUM_FEATURES + j] = X_temp.data[(train_size + i) * IRIS_NUM_FEATURES + j];
-        }
-        for (int j = 0; j < IRIS_NUM_CLASSES; j++) {
-            Y_test->data[i * IRIS_NUM_CLASSES + j] = Y_temp.data[(train_size + i) * IRIS_NUM_CLASSES + j];
-        }
+    if (layer->cache_weights->dim1 != layer->dweights->dim1 || layer->cache_weights->dim2 != layer->dweights->dim2) {
+        fprintf(stderr, "Error: cach_weights dimensions do not match dweights.\n");
+        exit(1);
     }
 
-    // Free temporary arrays
-    free(X_temp.data);
-    free(Y_temp.data);
+    if (layer->cache_bias->dim1 != layer->dbiases->dim1 || layer->cache_bias->dim2 != layer->dbiases->dim2) {
+        fprintf(stderr, "Error: cach_bias dimensions do not match dbiases.\n");
+        exit(1);
+    }
+
+    // Apply learning rate decay (if decay factor is specified)
+    if (decay_rate > 0.0) {
+        *learning_rate = *learning_rate / (1.0 + decay_rate * t);
+    }
+
+    // Update momentum (first moment) with current gradients
+    for (int i = 0; i < layer->weights->dim1 * layer->weights->dim2; i++) {
+        layer->w_velocity->data[i] = beta_1 * layer->w_velocity->data[i] + (1.0 - beta_1) * layer->dweights->data[i];
+    }
+
+    for (int i = 0; i < layer->dbiases->dim1 * layer->dbiases->dim2; i++) {
+        layer->b_velocity->data[i] = beta_1 * layer->b_velocity->data[i] + (1.0 - beta_1) * layer->dbiases->data[i];
+    }
+
+    // Correct momentum 
+    for (int i = 0; i < layer->weights->dim1 * layer->weights->dim2; i++) {
+        layer->w_velocity->data[i] = layer->w_velocity->data[i] / (1.0 - pow(beta_1, t + 1)); // Bias correction for momentum
+
+        // Update cache 
+        layer->cache_weights->data[i] = beta_2 * layer->cache_weights->data[i] + (1.0 - beta_2) * layer->dweights->data[i] * layer->dweights->data[i];
+    }
+
+    for (int i = 0; i < layer->biases->dim2; i++) {
+        layer->b_velocity->data[i] = layer->b_velocity->data[i] / (1.0 - pow(beta_1, t + 1)); // Bias correction for bias momentum
+
+        // Update cache 
+        layer->cache_bias->data[i] = beta_2 * layer->cache_bias->data[i] + (1.0 - beta_2) * layer->dbiases->data[i] * layer->dbiases->data[i];
+    }
+
+    // Bias correction for cache
+    for (int i = 0; i < layer->weights->dim1 * layer->weights->dim2; i++) {
+        layer->cache_weights->data[i] = layer->cache_weights->data[i] / (1.0 - pow(beta_2, t + 1)); // Bias correction for weight cache
+    }
+
+    for (int i = 0; i < layer->biases->dim2; i++) {
+        layer->cache_bias->data[i] = layer->cache_bias->data[i] / (1.0 - pow(beta_2, t + 1)); // Bias correction for bias cache
+    }
+
+    // Update weights and biases using corrected momenta and cache
+    for (int i = 0; i < layer->weights->dim1 * layer->weights->dim2; i++) {
+        layer->weights->data[i] -= (*learning_rate) * layer->w_velocity->data[i] / (sqrt(layer->cache_weights->data[i]) + epsilon);
+    }
+
+    for (int i = 0; i < layer->biases->dim2; i++) {
+        layer->biases->data[i] -= (*learning_rate) * layer->b_velocity->data[i] / (sqrt(layer->cache_bias->data[i]) + epsilon);
+    }
 }

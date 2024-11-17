@@ -14,26 +14,29 @@ Includes
     > An array of loss history per training iteration
 */
 typedef struct {
-    layer_dense** layers;
-    int* num_neurons_in_layer;
-    int num_layers;
-    int batch_size;
-    int num_features;
-    double learning_rate;
-    double decay_rate;
-    int num_epochs;
-    int current_epoch;
-    double* loss_history;
-    bool momentum;
-    double beta;
-    ActivationType activation;
+    layer_dense** layers; // Layer dense array of layer dense pointers.
+    ActivationType* activations_per_layer; // Array of activation type for each layer respectively
+    OptimizationType* optimizations_per_layer; // Array of optimization type for each layer respectivley.
+    int* num_neurons_in_layer; // Array of num neurons in each layer respectively
+    int num_layers; // Number of layers in network
+    int batch_size; // Size of input batch
+    int num_features; // Number of features in input data
+    double learning_rate; // Optimization learning rate
+    double decay_rate; // Optimization learning decay rate
+    int num_epochs;  // Total number of epochs
+    int current_epoch; // Current epoch iteration
+    double* loss_history; // History over batch losses
+    bool momentum; // Momentum flag
+    double beta_1; // Momentum Hyperparameter
+    double beta_2; // Cache Hyperparameter
+    double epsilon; // Optimization Hyperparameter
 } NeuralNetwork;
 
 /*
 Initializes the Neural Network architechture 
 */
 NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epochs, int* num_neurons_in_layer, double learning_rate,
-                                   ActivationType activation, int num_features);
+                                   ActivationType* activations, OptimizationType* optimizations, int num_features);
 /*
 Frees neural network from memory
 */

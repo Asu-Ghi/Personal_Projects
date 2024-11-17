@@ -2,7 +2,7 @@
 
 
 NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epochs, int* num_neurons_in_layer, double learning_rate,
-                                   ActivationType activation, int num_batch_features) {
+                                   ActivationType* activations, OptimizationType* optimizations, int num_batch_features) {
 
     // Allocate memory for the network
     NeuralNetwork* n_network = (NeuralNetwork*)malloc(sizeof(NeuralNetwork));
@@ -12,30 +12,35 @@ NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epoch
     n_network->batch_size = batch_size;
     n_network->num_features = num_batch_features;
     n_network->learning_rate = learning_rate;
-    n_network->decay_rate = 0.0; // initialize to 0
+    n_network->decay_rate = 0.0; 
     n_network->num_epochs = num_epochs;
-    n_network->activation = activation;
+    n_network->activations_per_layer = activations; 
+    n_network->optimizations_per_layer = optimizations;
     n_network->num_neurons_in_layer = num_neurons_in_layer;
-    n_network->current_epoch = 0;
-    n_network->momentum = false; // initializes to false
-    n_network->beta = 0.8; // initializes to 0.8
+    n_network->current_epoch = 0; 
+    n_network->momentum = false; 
+    n_network->beta_1 = 0.90; // initializes to 0.9 -> Used for Momentum
+    n_network->beta_2 = 0.999; // initializes to 0.999 -> Used for Cachce
+    n_network->epsilon = 1e-7; // epsilon(ADA GRAD, RMSPROP)
+
 
     // Allocate memory for loss history and layers
     n_network->loss_history = (double*) calloc(n_network->num_epochs, sizeof(double));
     n_network->layers = (layer_dense**) malloc(n_network->num_layers * sizeof(layer_dense*));
 
     // Allocate memory for the first layer with `num_features`
-    n_network->layers[0] = init_layer(num_batch_features, n_network->num_neurons_in_layer[0], n_network->activation, n_network->batch_size);
+    n_network->layers[0] = init_layer(num_batch_features, n_network->num_neurons_in_layer[0], 
+                                    n_network->activations_per_layer[0], n_network->optimizations_per_layer[0], n_network->batch_size);
 
     // Allocate memory for hidden layers
     for (int i = 1; i < n_network->num_layers - 1; i++) {
         n_network->layers[i] = init_layer(n_network->layers[i-1]->num_neurons, n_network->num_neurons_in_layer[i], 
-                                          n_network->activation, n_network->batch_size);
+                                     n_network->activations_per_layer[i], n_network->optimizations_per_layer[i], n_network->batch_size);
     }
 
     // Allocate memory for the output layer
     n_network->layers[num_layers - 1] = init_layer(n_network->layers[num_layers - 2]->num_neurons, n_network->num_neurons_in_layer[num_layers - 1], 
-                                                   SOFTMAX, n_network->batch_size);
+                                    n_network->activations_per_layer[num_layers-1], n_network->optimizations_per_layer[num_layers-1], n_network->batch_size);
 
     return n_network;
 }
@@ -58,14 +63,10 @@ void print_nn_info(NeuralNetwork* network) {
     printf("NUMBER OF INPUT FEATURES: %d\n",network->num_features);
     printf("NUMBER OF EPOCHS: %d\n", network->num_epochs);
     printf("LEARNING RATE: %f\n", network->learning_rate);
-    printf("DECAY RATE: %f\n", network->decay_rate);
-
-    if (network->momentum) {
-        printf("USING MOMENTUM; BETA = %f\n", network->beta);
-    }
-    else {
-        printf("NOT USING MOMENTUM\n");
-    }
+    printf("DECAY RATE(RHO): %f\n", network->decay_rate);
+    printf("BETA_1 (MOMENTUMS): %f\n", network->beta_1);
+    printf("BETA_2 (RMSPROP CACHES): %f\n", network->beta_2);
+    printf("EPSILON: %.8f\n", network->epsilon);
     printf("#############################################\n");
     printf("#############################################\n");
 
@@ -102,20 +103,51 @@ void update_parameters(NeuralNetwork* network) {
     for (int i = 0; i < network->num_layers - 1; i++) {
         // Update weights and biases for each layer(currently uses SGD)
 
-        // If using momentum
-        if (network->momentum) {
+        // If using momentum SGD
+        if (network->layers[i]->optimization == SGD_MOMENTUM) {
             update_params_sgd_momentum(network->layers[i], &network->learning_rate, network->current_epoch, network->decay_rate,
-                                        network->beta);
+                                        network->beta_1);
         }
-        // If not using momentum
-        else {
+        // If using SGD without momentum
+        else if (network->layers[i]->optimization == SGD) {
             update_params_sgd(network->layers[i], &network->learning_rate, network->current_epoch, network->decay_rate);
         }
-    }
+
+        // If using ADA GRAD
+        else if (network->layers[i]->optimization == ADA_GRAD) {
+            update_params_adagrad(network->layers[i], &network->learning_rate, network->decay_rate, network->epsilon);
+        }
+
+        // If using RMS PROP
+        else if (network->layers[i]->optimization == RMS_PROP) {
+            update_params_rmsprop(network->layers[i], &network->learning_rate, network->decay_rate, network->epsilon);
+
+        }
+
+        // If using ADAM
+        else if (network->layers[i]->optimization == ADAM) {
+            update_params_adam(network->layers[i], &network->learning_rate, network->decay_rate, network->beta_1, 
+                                network->beta_2, network->epsilon, network->current_epoch);
+        }
+
+        // Error handling
+        else {
+            fprintf(stderr, "Error: Incorrect Optimization Entered.\n");
+            free_neural_network(network);
+            exit(1);
+        }
+        
+    }   
 }
 
 void train_nn(NeuralNetwork* network, matrix* X, matrix* Y) {
+    // Print layer optimizations 
+    for (int i = 0; i < network->num_layers; i++) {
+        printf("Layer: %d, Optimization: %s, Activation: %s\n", i, 
+                optimization_type_to_string(network->layers[i]->optimization), activation_type_to_string(network->layers[i]->activation));
+    }
 
+    // Epoch Iterations
     for (int epoch = 0; epoch < network->num_epochs; epoch++) {
 
         // Step 1: Forward Pass

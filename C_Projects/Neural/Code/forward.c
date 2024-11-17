@@ -2,9 +2,6 @@
 
 //////////////////////////////////////////////////// Forward Pass Methods //////////////////////////////////////////////////////////////
 
-/*
-Performs a forward pass using a batch of inputs and a given layer.
-*/
 void forward_pass(matrix* inputs, layer_dense* layer) {
 
     // Copy inputs into layer structure
@@ -68,10 +65,6 @@ void forward_pass(matrix* inputs, layer_dense* layer) {
     free(mult_matrix);
 }
 
-/*
-Apply non linearity to forward passes using ReLu Activation
-Steps: If a value is less than 0, rectify it to 0.
-*/
 void forward_reLu(matrix* batch_input) {
     // iterate through every point in the batch input
     for (int i = 0; i < batch_input->dim1 * batch_input->dim2; i++){
@@ -83,10 +76,6 @@ void forward_reLu(matrix* batch_input) {
     }
 }
 
-
-/*
-Calculate the probabilities for classification problems using SoftMax activation.
-*/
 void forward_softMax(matrix* batch_input) {
     // iterate over the batch
     for(int i = 0; i < batch_input -> dim1; i++) {

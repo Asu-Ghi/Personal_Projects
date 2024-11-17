@@ -114,7 +114,7 @@ void test_init_layer() {
     ActivationType test_type = RELU;
     int batch_size = 10;
 
-    layer_dense* test_layer = init_layer(num_input_features, num_neurons, test_type, batch_size);
+    layer_dense* test_layer = init_layer(num_input_features, num_neurons, test_type, SGD_MOMENTUM, batch_size);
 
     // Check Weights Dimensions
     if (test_layer->weights->dim1 != 3 || test_layer->weights->dim2 != 4) {
@@ -211,7 +211,7 @@ void test_forward_pass() {
     Test First Layer Forward Pass.
     */
     printf("---------LAYER 1 (FIRST)------------\n");
-    layer_dense* first_layer = init_layer(NUM_BATCH_FEATURES, NUM_NEURONS_1, RELU, BATCH_SIZE);
+    layer_dense* first_layer = init_layer(NUM_BATCH_FEATURES, NUM_NEURONS_1, RELU, SGD_MOMENTUM, BATCH_SIZE);
     forward_pass(&inputs, first_layer);
 
     // Check Dimensions for PreActivation Outputs
@@ -242,7 +242,7 @@ void test_forward_pass() {
     Test Hidden Layer Forward Pass.
     */
     printf("---------LAYER 2 (HIDDEN)------------\n");
-    layer_dense* second_layer = init_layer(NUM_INPUT_FEATURES_2, NUM_NEURONS_2, RELU, BATCH_SIZE);
+    layer_dense* second_layer = init_layer(NUM_INPUT_FEATURES_2, NUM_NEURONS_2, RELU, SGD_MOMENTUM, BATCH_SIZE);
     forward_pass(first_layer->post_activation_output, second_layer);
 
     // Check Dimensions for PreActivation Outputs
@@ -274,7 +274,7 @@ void test_forward_pass() {
     Test Final Layer Forward Pass.
     */
     printf("---------LAYER 3 (LAST)------------\n");
-    layer_dense* third_layer = init_layer(NUM_INPUT_FEATURES_3, NUM_NEURONS_3, SOFTMAX, BATCH_SIZE);
+    layer_dense* third_layer = init_layer(NUM_INPUT_FEATURES_3, NUM_NEURONS_3, SOFTMAX, SGD_MOMENTUM, BATCH_SIZE);
     forward_pass(second_layer->post_activation_output, third_layer);
     
     // Check Dimensions for PreActivation Outputs
@@ -331,9 +331,9 @@ void test_accuracy() {
     inputs.dim2 = NUM_BATCH_FEATURES;
 
     // Create Layers for Forward Pass
-    layer_dense* layer_one = init_layer(NUM_BATCH_FEATURES, NUM_NEURONS_1, RELU, BATCH_SIZE);
-    layer_dense* layer_two = init_layer(NUM_INPUT_FEATURES_2, NUM_NEURONS_2, RELU, BATCH_SIZE);
-    layer_dense* layer_three = init_layer(NUM_INPUT_FEATURES_3, NUM_NEURONS_3, SOFTMAX, BATCH_SIZE);
+    layer_dense* layer_one = init_layer(NUM_BATCH_FEATURES, NUM_NEURONS_1, RELU, SGD_MOMENTUM, BATCH_SIZE);
+    layer_dense* layer_two = init_layer(NUM_INPUT_FEATURES_2, NUM_NEURONS_2, RELU, SGD_MOMENTUM, BATCH_SIZE);
+    layer_dense* layer_three = init_layer(NUM_INPUT_FEATURES_3, NUM_NEURONS_3, SOFTMAX, SGD_MOMENTUM, BATCH_SIZE);
 
     // Perform forward pass
     forward_pass(&inputs, layer_one);
@@ -381,9 +381,9 @@ void test_loss_categorical() {
     inputs.dim2 = NUM_BATCH_FEATURES;
 
     // Create Layers for Forward Pass
-    layer_dense* layer_one = init_layer(NUM_BATCH_FEATURES, NUM_NEURONS_1, RELU, BATCH_SIZE);
-    layer_dense* layer_two = init_layer(NUM_INPUT_FEATURES_2, NUM_NEURONS_2, RELU, BATCH_SIZE);
-    layer_dense* layer_three = init_layer(NUM_INPUT_FEATURES_3, NUM_NEURONS_3, SOFTMAX, BATCH_SIZE);
+    layer_dense* layer_one = init_layer(NUM_BATCH_FEATURES, NUM_NEURONS_1, RELU, SGD_MOMENTUM, BATCH_SIZE);
+    layer_dense* layer_two = init_layer(NUM_INPUT_FEATURES_2, NUM_NEURONS_2, RELU, SGD_MOMENTUM, BATCH_SIZE);
+    layer_dense* layer_three = init_layer(NUM_INPUT_FEATURES_3, NUM_NEURONS_3, SOFTMAX, SGD_MOMENTUM, BATCH_SIZE);
 
     // Perform forward pass
     forward_pass(&inputs, layer_one);
@@ -453,9 +453,9 @@ void test_backward_pass() {
     inputs.dim2 = NUM_BATCH_FEATURES;
 
     // Create Layers for Forward Pass
-    layer_dense* layer_one = init_layer(NUM_BATCH_FEATURES, NUM_NEURONS_1, RELU, BATCH_SIZE);
-    layer_dense* layer_two = init_layer(NUM_INPUT_FEATURES_2, NUM_NEURONS_2, RELU, BATCH_SIZE);
-    layer_dense* layer_three = init_layer(NUM_INPUT_FEATURES_3, NUM_NEURONS_3, SOFTMAX, BATCH_SIZE);
+    layer_dense* layer_one = init_layer(NUM_BATCH_FEATURES, NUM_NEURONS_1, RELU, SGD_MOMENTUM, BATCH_SIZE);
+    layer_dense* layer_two = init_layer(NUM_INPUT_FEATURES_2, NUM_NEURONS_2, RELU, SGD_MOMENTUM, BATCH_SIZE);
+    layer_dense* layer_three = init_layer(NUM_INPUT_FEATURES_3, NUM_NEURONS_3, SOFTMAX, SGD_MOMENTUM, BATCH_SIZE);
 
     // Perform forward pass
     forward_pass(&inputs, layer_one);
@@ -687,9 +687,9 @@ void test_update_params_sgd() {
     class_targets.data = class_target_data;
 
     // Initialize 3 layer network
-    layer_dense* layer_one = init_layer(NUM_BATCH_FEATURES, NUM_NEURONS_1, RELU, BATCH_SIZE);
-    layer_dense* layer_two = init_layer(NUM_INPUT_FEATURES_2, NUM_NEURONS_2, RELU, BATCH_SIZE);
-    layer_dense* layer_three = init_layer(NUM_INPUT_FEATURES_3, NUM_NEURONS_3, SOFTMAX, BATCH_SIZE);
+    layer_dense* layer_one = init_layer(NUM_BATCH_FEATURES, NUM_NEURONS_1, RELU, SGD_MOMENTUM, BATCH_SIZE);
+    layer_dense* layer_two = init_layer(NUM_INPUT_FEATURES_2, NUM_NEURONS_2, RELU, SGD_MOMENTUM, BATCH_SIZE);
+    layer_dense* layer_three = init_layer(NUM_INPUT_FEATURES_3, NUM_NEURONS_3, SOFTMAX, SGD_MOMENTUM, BATCH_SIZE);
 
     // Allocate memory for 
 
@@ -737,9 +737,12 @@ void test_init_neural_network() {
     printf("//////////////////////////////////////////////////////\n");
     // Create int array off defined constants
     int num_neurons_in_layers[NUM_LAYERS] = {NUM_NEURONS_LAYER_1, NUM_NEURONS_LAYER_2, NUM_NEURONS_LAYER_3};
+    ActivationType activations[NUM_LAYERS] = {RELU, RELU, SOFTMAX};
+    OptimizationType optimizations[NUM_LAYERS] = {SGD_MOMENTUM, SGD_MOMENTUM, SGD_MOMENTUM};
+
     // Initialize layer based off defined constants
     NeuralNetwork* test_network = init_neural_network(NUM_LAYERS, BATCH_SIZE, NUM_EPOCHS, num_neurons_in_layers, 
-                                                LEARNING_RATE, RELU, NUM_BATCH_FEATURES);
+                                                LEARNING_RATE, activations, optimizations, NUM_BATCH_FEATURES);
 
     // Check to see if layer was allocated properly
     if (test_network == NULL) {
@@ -801,9 +804,12 @@ void test_forward_pass_nn() {
     printf("//////////////////////////////////////////////////////\n");
     // Create int array off defined constants
     int num_neurons_in_layers[NUM_LAYERS] = {NUM_NEURONS_LAYER_1, NUM_NEURONS_LAYER_2, NUM_NEURONS_LAYER_3};
+    ActivationType activations[NUM_LAYERS] = {RELU, RELU, SOFTMAX};
+    OptimizationType optimizations[NUM_LAYERS] = {SGD_MOMENTUM, SGD_MOMENTUM, SGD_MOMENTUM};
+
     // Initialize layer based off defined constants
     NeuralNetwork* network = init_neural_network(NUM_LAYERS, BATCH_SIZE, NUM_EPOCHS, num_neurons_in_layers, 
-                                                LEARNING_RATE, RELU, NUM_BATCH_FEATURES);
+                                                LEARNING_RATE, activations, optimizations, NUM_BATCH_FEATURES);
 
     // Check to see if layer was allocated properly
     if (network == NULL) {
@@ -873,9 +879,12 @@ void test_backward_pass_nn() {
     printf("//////////////////////////////////////////////////////\n");
     // Create int array off defined constants
     int num_neurons_in_layers[NUM_LAYERS] = {NUM_NEURONS_LAYER_1, NUM_NEURONS_LAYER_2, NUM_NEURONS_LAYER_3};
+    ActivationType activations[NUM_LAYERS] = {RELU, RELU, SOFTMAX};
+    OptimizationType optimizations[NUM_LAYERS] = {SGD_MOMENTUM, SGD_MOMENTUM, SGD_MOMENTUM};
+
     // Initialize layer based off defined constants
     NeuralNetwork* network = init_neural_network(NUM_LAYERS, BATCH_SIZE, NUM_EPOCHS, num_neurons_in_layers, 
-                                                LEARNING_RATE, RELU, NUM_BATCH_FEATURES);
+                                                LEARNING_RATE, activations, optimizations, NUM_BATCH_FEATURES);
 
     // Check to see if layer was allocated properly
     if (network == NULL) {
@@ -944,9 +953,12 @@ void test_train_nn(){
     printf("//////////////////////////////////////////////////////\n");
     // Create int array off defined constants
     int num_neurons_in_layers[NUM_LAYERS] = {NUM_NEURONS_LAYER_1, NUM_NEURONS_LAYER_2, NUM_NEURONS_LAYER_3};
+    ActivationType activations[NUM_LAYERS] = {RELU, RELU, SOFTMAX};
+    OptimizationType optimizations[NUM_LAYERS] = {SGD_MOMENTUM, SGD_MOMENTUM, SGD_MOMENTUM};
+
     // Initialize layer based off defined constants
     NeuralNetwork* network = init_neural_network(NUM_LAYERS, BATCH_SIZE, NUM_EPOCHS, num_neurons_in_layers, 
-                                                LEARNING_RATE, RELU, NUM_BATCH_FEATURES);
+                                                LEARNING_RATE, activations, optimizations, NUM_BATCH_FEATURES);
 
     // Check to see if layer was allocated properly
     if (network == NULL) {

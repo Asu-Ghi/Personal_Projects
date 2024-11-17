@@ -28,8 +28,22 @@ Enum to store what activation function is being used
 */
 typedef enum {
     RELU,
-    SOFTMAX
+    SOFTMAX,
+    SIGMOID,
+    TANH
 } ActivationType;
+
+/*
+Optimization function enum structure
+Enum to store what optimization function to use.
+*/
+typedef enum {
+    SGD,
+    SGD_MOMENTUM,
+    ADA_GRAD,
+    RMS_PROP,
+    ADAM
+}OptimizationType;
 
 /*
 layer_dense data structure 
@@ -50,7 +64,10 @@ typedef struct {
     matrix* dinputs;
     matrix* w_velocity; // used to calculate momentums for weight
     matrix* b_velocity; // used to calculate momentums for bias
-    ActivationType activation;
+    matrix* cache_weights; // used to adjust gradients 
+    matrix* cache_bias; // used in adagrad for adjusting gradients
+    ActivationType activation; // Stores activation function
+    OptimizationType optimization; // Store optimization function
 } layer_dense;
 
 /*
@@ -62,17 +79,43 @@ typedef enum {
     SPARSE
 } ClassLabelEncoding;
 
+
+
+/////////////////////////////////////////////////////// Misc. Methods /////////////////////////////////////////////////////////////////
+
 /*
-Optimization function enum structure
-Enum to store what optimization function to use.
+Loads IRIS Data in for training
+Initializes X_train, Y_train, X_test, and Y_test.
+Class Labels (One-Hot)
+    > 0 : Iris-Setosa
+    > 1 : Iris-versicolor
+    > 2: Iris-virginica
 */
-typedef enum {
-    SGD,
-    SGD_MOMENTUM,
-    ADA_GRAD,
-    RMS_PROP,
-    ADAM
-}OptimizationType;
+void load_iris_data(char* file_path, matrix* X_train, matrix* Y_train, matrix* X_test, 
+                    matrix* Y_test, int num_batches, double train_ratio);
+
+/*
+Loads X data set
+*/
+void load_data(const char *filename, double *data, int rows, int cols);
+
+/*
+Loads Y labels
+*/
+void load_labels(const char *filename, int *labels, int size);
+
+/*
+Convert Optimization enum to a string
+*/
+char* optimization_type_to_string(OptimizationType type);
+
+
+/*
+Convert Activation Enum to a String
+*/
+char* activation_type_to_string(ActivationType type);
+
+
 
 //////////////////////////////////////////////////// Linear Algebra Methods //////////////////////////////////////////////////////////////
 
@@ -110,7 +153,7 @@ Allocates and checks memory for:
     >pre_activation_outputs
     >post_activation_outputs
 */
-layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activation, int batch_size);
+layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activation, OptimizationType optimization, int batch_size);
 
 /*
 Frees layer dense memory. Deallocates memory for 
@@ -146,33 +189,42 @@ matrix* loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_laye
 
 /*
 SGD Optimization
-ADD INFO HERE
+Stochastic Gradient Descent with learning rate decay.
 */
 void update_params_sgd(layer_dense* layer, double* learning_rate, int current_epoch, double decay_rate);
 
 /*
 SGD Optimization with momentum
-ADD INFO HERE
+Stochastic Gradient Descent with Momentum.
+Uses momentum to help push out of local extrema when performing gradient descent through SGD.
+Take in extra hyperparameters beta to calculate momentumns.
 */
 void update_params_sgd_momentum(layer_dense* layer, double* learning_rate, int current_epoch, double decay_rate, double beta);
 
 
 /*
-Adam Optimization
-ADD INFO HERE
+ADA GRAD Optimization
+Adaptive Gradient. 
+Normalizes the layer gradients with a store local per parameter learning rate calculated from previous gradient changes.
 */
-void update_params_adam();
+void update_params_adagrad(layer_dense* layer, double* learning_rate, double decay_rate, double epsilon);
 
 /*
-Loads IRIS Data in for training
-Initializes X_train, Y_train, X_test, and Y_test.
-Class Labels (One-Hot)
-    > 0 : Iris-Setosa
-    > 1 : Iris-versicolor
-    > 2: Iris-virginica
+RMSPROP
+Root mean Squared Propogation. 
+Similar to Adaptive Gradient with local per parameter learning rate, but uses a different formula to calculate cache.
 */
-void load_iris_data(char* file_path, matrix* X_train, matrix* Y_train, matrix* X_test, 
-matrix* Y_test, int num_batches, double train_ratio);
+void update_params_rmsprop(layer_dense* layer, double* learning_rate, double decay_rate, double epsilon);
+
+/*
+Adam Optimization
+Adaptive Momentum.
+For Batch Gradient Descent t = current epoch
+For Mini Batch Gradient Descent t is incriminted after every mini batch.
+Beta_1 and Beta_2 are hyperparameters affecting momentum and RMSProp caches respectively. 
+*/
+void update_params_adam (layer_dense* layer, double* learning_rate, double decay_rate, 
+                    double beta_1, double beta_2, double epsilon, int t);
 
 
 
