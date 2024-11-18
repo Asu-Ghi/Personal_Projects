@@ -1,3 +1,12 @@
+/*
+Asu Ghimire
+11/17/2024
+
+Network "Class".
+Interfaces with forward.c, backward.c, utils.c to allow for the creation of a Neural Network.
+
+*/
+
 #ifndef NETWORK_H
 #define NETWORK_H
 #include "forward.h"
@@ -30,13 +39,16 @@ typedef struct {
     double beta_1; // Momentum Hyperparameter
     double beta_2; // Cache Hyperparameter
     double epsilon; // Optimization Hyperparameter
+    bool debug; // Prints learning vals after each epoch, otherwise just once at the end
+    double accuracy; // Stores network accuracy after each epoch
+    double loss; // Stores network loss after each epoch
 } NeuralNetwork;
 
 /*
 Initializes the Neural Network architechture 
 */
 NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epochs, int* num_neurons_in_layer, double learning_rate,
-                                   ActivationType* activations, OptimizationType* optimizations, int num_features);
+                                   ActivationType* activations, OptimizationType* optimizations, bool* regularizations, int num_features);
 /*
 Frees neural network from memory
 */

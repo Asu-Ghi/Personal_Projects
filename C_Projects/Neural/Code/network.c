@@ -2,7 +2,7 @@
 
 
 NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epochs, int* num_neurons_in_layer, double learning_rate,
-                                   ActivationType* activations, OptimizationType* optimizations, int num_batch_features) {
+                                   ActivationType* activations, OptimizationType* optimizations, bool* regularizations, int num_batch_features) {
 
     // Allocate memory for the network
     NeuralNetwork* n_network = (NeuralNetwork*)malloc(sizeof(NeuralNetwork));
@@ -22,6 +22,9 @@ NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epoch
     n_network->beta_1 = 0.90; // initializes to 0.9 -> Used for Momentum
     n_network->beta_2 = 0.999; // initializes to 0.999 -> Used for Cachce
     n_network->epsilon = 1e-7; // epsilon(ADA GRAD, RMSPROP)
+    n_network->debug = true;
+    n_network->accuracy = 0.0;
+    n_network->loss = 0.0;
 
 
     // Allocate memory for loss history and layers
@@ -31,17 +34,27 @@ NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epoch
     // Allocate memory for the first layer with `num_features`
     n_network->layers[0] = init_layer(num_batch_features, n_network->num_neurons_in_layer[0], 
                                     n_network->activations_per_layer[0], n_network->optimizations_per_layer[0], n_network->batch_size);
+   
+    // Adjust layers "useRegularization" variable
+    n_network->layers[0]->useRegularization = regularizations[0];
 
     // Allocate memory for hidden layers
     for (int i = 1; i < n_network->num_layers - 1; i++) {
         n_network->layers[i] = init_layer(n_network->layers[i-1]->num_neurons, n_network->num_neurons_in_layer[i], 
                                      n_network->activations_per_layer[i], n_network->optimizations_per_layer[i], n_network->batch_size);
+        // Adjust layers "useRegularization" variable
+        n_network->layers[i]->useRegularization = regularizations[i];
+
     }
 
     // Allocate memory for the output layer
     n_network->layers[num_layers - 1] = init_layer(n_network->layers[num_layers - 2]->num_neurons, n_network->num_neurons_in_layer[num_layers - 1], 
                                     n_network->activations_per_layer[num_layers-1], n_network->optimizations_per_layer[num_layers-1], n_network->batch_size);
 
+    // Adjust layers "useRegularization" variable
+    n_network->layers[num_layers-1]->useRegularization = regularizations[num_layers-1];
+
+    // Return network object
     return n_network;
 }
 
@@ -49,6 +62,9 @@ void free_neural_network(NeuralNetwork* network) {
     for (int i = 0; i < network->num_layers; i++) {
         free_layer(network->layers[i]);
     }
+    network->loss = 0.0;
+    network->accuracy = 0.0;
+    network->current_epoch = 0;
     free(network->loss_history);
     free(network->layers);
     free(network);
@@ -141,34 +157,53 @@ void update_parameters(NeuralNetwork* network) {
 }
 
 void train_nn(NeuralNetwork* network, matrix* X, matrix* Y) {
-    // Print layer optimizations 
-    for (int i = 0; i < network->num_layers; i++) {
-        printf("Layer: %d, Optimization: %s, Activation: %s\n", i, 
-                optimization_type_to_string(network->layers[i]->optimization), activation_type_to_string(network->layers[i]->activation));
+    // Print layer optimizations (if debug = true)
+    if (network->debug) {
+        for (int i = 0; i < network->num_layers; i++) {
+            printf("Layer: %d, Optimization: %s, Activation: %s\n", i, 
+            optimization_type_to_string(network->layers[i]->optimization), activation_type_to_string(network->layers[i]->activation));
+        }
     }
-
+    // calculate batch loss
+    double batch_loss = 0.0;
+    // calculate accuracy
+    double accuracy = 0.0;
     // Epoch Iterations
     for (int epoch = 0; epoch < network->num_epochs; epoch++) {
-
+        // reset batch loss
+        batch_loss = 0.0;
+        // reset accuracy
+        accuracy = 0.0;
         // Step 1: Forward Pass
         forward_pass_nn(network, X);
 
         // Step 2: Calculate Loss and Accuracy
-        double accuracy = calculate_accuracy(Y, network->layers[network->num_layers-1], ONE_HOT);
+        accuracy = calculate_accuracy(Y, network->layers[network->num_layers-1], ONE_HOT);
         matrix* example_losses = loss_categorical_cross_entropy(Y, network->layers[network->num_layers-1], ONE_HOT);
 
-        // calculate batch loss
-        double batch_loss = 0.0;
+
         for (int i = 0; i < network->batch_size; i++) {
             batch_loss+= example_losses->data[i];
         }
         batch_loss = batch_loss/network->batch_size;
 
+        // Calculate regularization for l1 and l2 
+        double regularization_val = 0.0;
+        for (int i = 0; i < network->num_layers; i++) {
+            regularization_val += calculate_regularization_loss(network->layers[i]);
+        } 
+
+        // Print training data (if debug = TRUE)
+        if (network->debug) {
+            printf("Epoch %d: Loss = %f, Regularization Loss = %f, Accuracy = %f, LR = %f \n", epoch, batch_loss, 
+                                regularization_val, accuracy, network->learning_rate);
+        }
+
+        // Sum regularization to loss
+        batch_loss += regularization_val;
+
         // Add loss to the loss history
         network->loss_history[epoch] = batch_loss;
-
-        // Print training data
-        printf("Epoch %d: Loss = %f, Accuracy = %f, LR = %f \n", epoch, batch_loss, accuracy, network->learning_rate);
 
         // Step 3: Backward Pass
         backward_pass_nn(network, Y);
@@ -178,7 +213,14 @@ void train_nn(NeuralNetwork* network, matrix* X, matrix* Y) {
 
         // Step 5: Update current epoch (for learning rate decay)
         network->current_epoch += 1;
+        
+        // Update loss and accuracy of network
+        network->loss = batch_loss;
+        network->accuracy = accuracy;
     }
+    // Print Final Accuracy
+    printf("Epoch %d: Loss = %f, Accuracy = %f, LR = %f \n", network->current_epoch, batch_loss, accuracy, network->learning_rate);
+  
 }
 
 void predict(NeuralNetwork* network, matrix* input_data) {

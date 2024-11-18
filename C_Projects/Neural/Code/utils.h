@@ -1,4 +1,17 @@
-// utils.h
+/*
+Asu Ghimire
+11/17/2024
+
+Utility "Class".
+Provides basic utilites for forward.c, backward.c, network.c
+Handles 
+    > Linear algebra functionalities
+    > Data loading 
+    > Layer initialization
+    > Accuracy calculation
+    > Loss calculation
+    > Optimization
+*/
 #ifndef UTILS_H
 #define UTILS_H
 
@@ -68,7 +81,10 @@ typedef struct {
     matrix* cache_bias; // used in adagrad for adjusting gradients
     ActivationType activation; // Stores activation function
     OptimizationType optimization; // Store optimization function
-} layer_dense;
+    bool useRegularization; // Flag to determine if using regularization in forward and backwards.
+    double lambda_l1;  // L1 regularization coefficient
+    double lambda_l2;  // L2 regularization coefficient} 
+}layer_dense;
 
 /*
 Class label encoding enum structure
@@ -186,6 +202,13 @@ Takes in the type of class target encoding (either one hot or sparse)
 Returns a matrix of loss coresponding to the output of softmax and the # of classes to be classified.
 */
 matrix* loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer, ClassLabelEncoding encoding);
+
+/*
+Calculates regularization l1 and l2 for a given layer.
+Checks to see if layer has property "useRegularization"
+Returns a double of summed regularization costs for l1 and l2 weights and biases
+*/
+double calculate_regularization_loss(layer_dense* layer);
 
 /*
 SGD Optimization

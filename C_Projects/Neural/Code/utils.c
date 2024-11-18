@@ -1,3 +1,5 @@
+
+
 #include "utils.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -369,13 +371,17 @@ layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activati
     }
 
     // randomize weights
-    srand(time(NULL));  // Seed random number with current time
-
+    // srand(time(NULL));  // Seed random number with current time
+    srand(42);
     //  n_inputs x n_neurons matrix
     for (int i = 0; i < num_neurons * num_inputs; i++){
         // Random between -1 and 1 scaled by sqrt(1/n)
         // He initialization
-        layer_->weights->data[i] = sqrt(1.0 / num_inputs) * ((double)rand() / RAND_MAX * 2.0 - 1.0);  
+        // layer_->weights->data[i] = sqrt(1.0 / num_inputs) * ((double)rand() / RAND_MAX * 2.0 - 1.0);  
+
+        // Xavier init
+        layer_->weights->data[i] = sqrt(1.0 / (num_inputs + num_neurons)) * ((double)rand() / RAND_MAX * 2.0 - 1.0);
+
     }
 
     // initialize other matrix objects, also allocate memory
@@ -396,6 +402,13 @@ layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activati
 
     // initialize optimization function for the layer
     layer_->optimization = optimization;
+
+    // Init use regularization to false
+    layer_->useRegularization = false;
+
+    // Init lambda for regularization
+    layer_->lambda_l1 = 0.001;
+    layer_->lambda_l2 = 0.01;
 
     // Initialize velocity for weights
     layer_->w_velocity = (matrix*)malloc(sizeof(matrix));
@@ -665,6 +678,39 @@ matrix* loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_laye
 
     // return losses
     return(losses);
+}
+
+double calculate_regularization_loss(layer_dense* layer) {
+
+    // Check if using regularization
+    if (!layer->useRegularization) {
+        return 0.0;
+    }
+
+    double l1_w = 0.0; // L1 weight regularization
+    double l2_w = 0.0; // L2 weight regularization
+    double l1_b = 0.0; // L1 bias regularization
+    double l2_b = 0.0; // L2 bias regularization
+
+    // Weight regularization L1 and L2
+    for (int i = 0; i < layer->weights->dim1 * layer->weights->dim2; i++) {
+        l1_w += fabs(layer->weights->data[i]);
+        l2_w += layer->weights->data[i] * layer->weights->data[i];
+    }
+
+    // Bias regularization L1 and L2
+    for (int i = 0; i <layer->biases->dim1 * layer->biases->dim2; i++) {
+        l1_b += fabs(layer->biases->data[i]);
+        l2_b += layer->biases->data[i] * layer->biases->data[i];
+    }
+
+    // Multiply regularizations by lambda and return sum of all regularizations
+    l1_w *= layer->lambda_l1;
+    l2_w *= layer->lambda_l2;
+    l1_b *= layer->lambda_l1;
+    l2_b *= layer->lambda_l2;
+
+    return (l1_w + l2_w + l1_b + l2_b);
 }
 
 void update_params_sgd(layer_dense* layer, double* learning_rate, int current_epoch, double decay_rate) {

@@ -739,10 +739,10 @@ void test_init_neural_network() {
     int num_neurons_in_layers[NUM_LAYERS] = {NUM_NEURONS_LAYER_1, NUM_NEURONS_LAYER_2, NUM_NEURONS_LAYER_3};
     ActivationType activations[NUM_LAYERS] = {RELU, RELU, SOFTMAX};
     OptimizationType optimizations[NUM_LAYERS] = {SGD_MOMENTUM, SGD_MOMENTUM, SGD_MOMENTUM};
-
+    bool regularizations[NUM_LAYERS] = {true, true, true};
     // Initialize layer based off defined constants
     NeuralNetwork* test_network = init_neural_network(NUM_LAYERS, BATCH_SIZE, NUM_EPOCHS, num_neurons_in_layers, 
-                                                LEARNING_RATE, activations, optimizations, NUM_BATCH_FEATURES);
+                                                LEARNING_RATE, activations, optimizations, regularizations, NUM_BATCH_FEATURES);
 
     // Check to see if layer was allocated properly
     if (test_network == NULL) {
@@ -806,10 +806,11 @@ void test_forward_pass_nn() {
     int num_neurons_in_layers[NUM_LAYERS] = {NUM_NEURONS_LAYER_1, NUM_NEURONS_LAYER_2, NUM_NEURONS_LAYER_3};
     ActivationType activations[NUM_LAYERS] = {RELU, RELU, SOFTMAX};
     OptimizationType optimizations[NUM_LAYERS] = {SGD_MOMENTUM, SGD_MOMENTUM, SGD_MOMENTUM};
+    bool regularizations[NUM_LAYERS] = {true, true, true};
 
     // Initialize layer based off defined constants
     NeuralNetwork* network = init_neural_network(NUM_LAYERS, BATCH_SIZE, NUM_EPOCHS, num_neurons_in_layers, 
-                                                LEARNING_RATE, activations, optimizations, NUM_BATCH_FEATURES);
+                                                LEARNING_RATE, activations, optimizations,regularizations, NUM_BATCH_FEATURES);
 
     // Check to see if layer was allocated properly
     if (network == NULL) {
@@ -881,10 +882,11 @@ void test_backward_pass_nn() {
     int num_neurons_in_layers[NUM_LAYERS] = {NUM_NEURONS_LAYER_1, NUM_NEURONS_LAYER_2, NUM_NEURONS_LAYER_3};
     ActivationType activations[NUM_LAYERS] = {RELU, RELU, SOFTMAX};
     OptimizationType optimizations[NUM_LAYERS] = {SGD_MOMENTUM, SGD_MOMENTUM, SGD_MOMENTUM};
+    bool regularizations[NUM_LAYERS] = {true, true, true};
 
     // Initialize layer based off defined constants
     NeuralNetwork* network = init_neural_network(NUM_LAYERS, BATCH_SIZE, NUM_EPOCHS, num_neurons_in_layers, 
-                                                LEARNING_RATE, activations, optimizations, NUM_BATCH_FEATURES);
+                                                LEARNING_RATE, activations, optimizations, regularizations, NUM_BATCH_FEATURES);
 
     // Check to see if layer was allocated properly
     if (network == NULL) {
@@ -955,10 +957,11 @@ void test_train_nn(){
     int num_neurons_in_layers[NUM_LAYERS] = {NUM_NEURONS_LAYER_1, NUM_NEURONS_LAYER_2, NUM_NEURONS_LAYER_3};
     ActivationType activations[NUM_LAYERS] = {RELU, RELU, SOFTMAX};
     OptimizationType optimizations[NUM_LAYERS] = {SGD_MOMENTUM, SGD_MOMENTUM, SGD_MOMENTUM};
+    bool regularizations[NUM_LAYERS] = {true, true, true};
 
     // Initialize layer based off defined constants
     NeuralNetwork* network = init_neural_network(NUM_LAYERS, BATCH_SIZE, NUM_EPOCHS, num_neurons_in_layers, 
-                                                LEARNING_RATE, activations, optimizations, NUM_BATCH_FEATURES);
+                                                LEARNING_RATE, activations, optimizations, regularizations, NUM_BATCH_FEATURES);
 
     // Check to see if layer was allocated properly
     if (network == NULL) {
