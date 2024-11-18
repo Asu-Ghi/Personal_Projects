@@ -276,6 +276,28 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
         }
     }
 
+    // Add regularization derivatives to dweights and dbiases
+
+    // Check if using regularization
+    if (layer->useRegularization) {
+        // weights
+        for (int i = 0; i < layer->dweights->dim1 * layer->dweights->dim2; i++) {
+            // L2 gradients
+            layer->dweights->data[i] += 2 * layer->lambda_l2 * layer->weights->data[i];
+
+            // L1 gradients (1 if > 0, -1 if < 0)
+            layer->dweights->data[i] += layer->lambda_l1 * (layer->weights->data[i] >= 0.0 ? 1.0 : -1.0);
+        }
+        // biases
+        for (int i = 0; i < layer->dbiases->dim1 * layer->dbiases->dim2; i++) {
+            // L2 gradients
+            layer->dbiases->data[i] += 2 * layer->lambda_l2 * (layer->biases->data[i]);
+
+            // L1 gradients (1 if > 0, -1 if < 0)
+            layer->dbiases->data[i] += layer->lambda_l1 * (layer->biases->data[i] >= 0 ? 1.0: -1.0);
+        }
+    }
+
     // Backpropogate derivatives for previous layer
 
     // Transpose weights for layer
