@@ -1,12 +1,5 @@
-
-
 #include "utils.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
-#include <float.h>
-#include <stdbool.h>
+
 #define IRIS_NUM_FEATURES 4
 #define IRIS_NUM_CLASSES 3
 

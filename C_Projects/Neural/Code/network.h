@@ -46,6 +46,7 @@ typedef struct {
     double val_accuracy; // Stores network validation accuracy after each epoch
     double val_loss; // Stores network validation loss after each epoch
     bool useBiasCorrection; // Flag to determine wheter to use bias correction in ADAM
+    bool early_stopping; // Flag to determine wheter to stop training early based on val_loss ratio
 } NeuralNetwork;
 
 /*

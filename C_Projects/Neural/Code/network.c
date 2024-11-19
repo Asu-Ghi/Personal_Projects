@@ -176,9 +176,6 @@ void train_nn(NeuralNetwork* network, matrix* X, matrix* Y, matrix* X_validate, 
     // best val loss for training
     double best_val_loss = DBL_MAX;
 
-    int wait = 0;
-    int patience = 5; // Number of epochs to wait before stopping
-
     // Epoch Iterations
     for (int epoch = 0; epoch < network->num_epochs; epoch++) {
         // reset batch loss
@@ -223,24 +220,13 @@ void train_nn(NeuralNetwork* network, matrix* X, matrix* Y, matrix* X_validate, 
         network->loss = batch_loss;
         network->accuracy = accuracy;
 
-        // Validate Network
-        validate_model(network, X_validate, Y_validate, &val_loss, &val_accuracy);
-
-        // Check to see if validate loss is decreasing
-
-        // Check if first epoch
-        // Early Stopping Check
-        if (val_loss < best_val_loss) {
-            best_val_loss = val_loss;
-            wait = 0; // Reset wait counter if improvement found
-            // Save best validation accuracy/loss
+        // Validate Network every 50 epochs
+        if (epoch % 50 == 0) {
+            validate_model(network, X_validate, Y_validate, &val_loss, &val_accuracy);
             network->val_accuracy = val_accuracy;
             network->val_loss = val_loss;
-        } else if (++wait >= patience) {
-            printf("Early stopping at epoch %d\n", epoch);
-            break;
         }
-
+        
         // Print training data (if debug = TRUE)
         if (network->debug) {
             printf("Epoch %d: Model Loss = %f, Regularization Loss = %f, Model Accuracy = %f, LR = %f \n", epoch, batch_loss, 
