@@ -4,10 +4,66 @@
 
 void forward_pass(matrix* inputs, layer_dense* layer) {
 
+
+     // Allocate memory for layer input and dinput data
+    if(layer->inputs == NULL) {
+        layer->inputs = malloc(sizeof(matrix));
+        layer->inputs->dim1 = inputs->dim1;
+        layer->inputs->dim2 = inputs->dim2;
+        layer->inputs->data = (double*) calloc(layer->inputs->dim1 * layer->inputs->dim2, sizeof(double));
+        // Check memory allocation
+        if (layer->inputs->data == NULL) {
+            fprintf(stderr, "Error in memory allocation for inputs in forward pass.\n");
+            exit(1);
+        }   
+    } 
+
+    // derivative of inputs
+    if (layer->dinputs == NULL) {
+        layer->dinputs = (matrix*) malloc(sizeof(matrix));
+        layer->dinputs->dim1 = inputs->dim1;
+        layer->dinputs->dim2 = inputs->dim2;
+        layer->dinputs->data = (double*) calloc(layer->dinputs->dim1 * layer->dinputs->dim2, sizeof(double));
+        // Check memory allocation
+        if (layer->dinputs->data == NULL) {
+            fprintf(stderr, "Error in memory allocation for dinputs in forward pass.\n");
+            exit(1);
+        }
+    }
+
     // Copy inputs into layer structure
     memcpy(layer->inputs->data, inputs->data, layer->inputs->dim1 * layer->inputs->dim2 * sizeof(double));
 
 
+    // Allocate memory for pre activation outputs
+    if (layer->pre_activation_output == NULL) {
+        layer->pre_activation_output = malloc(sizeof(matrix));
+        layer->pre_activation_output->dim1 = inputs->dim1;
+        layer->pre_activation_output->dim2 = layer->num_neurons;
+        layer->pre_activation_output->data = (double*) calloc(layer->pre_activation_output->dim1*
+                                                        layer->pre_activation_output->dim2, sizeof(double));
+        // Check memory allocation
+        if (layer->pre_activation_output->data == NULL) {
+            fprintf(stderr, "Error in memory allocation for pre_activation_outputs in forward pass.\n");
+            exit(1);
+        }
+    }
+
+    // Allocate memory for post activation outputs
+    if (layer->post_activation_output == NULL) {
+        layer->post_activation_output = malloc(sizeof(matrix));
+        layer->post_activation_output->dim1 = inputs->dim1;
+        layer->post_activation_output->dim2 = layer->num_neurons;
+        layer->post_activation_output->data = (double*) calloc(layer->post_activation_output->dim1*
+                                                        layer->post_activation_output->dim2, sizeof(double));
+    
+       // Check memory allocation
+        if (layer->post_activation_output->data == NULL) {
+            fprintf(stderr, "Error in memory allocation for post_activation_output in forward pass.\n");
+            exit(1);
+        }
+    }
+  
     // Allocate output memory
     matrix* output = malloc(sizeof(matrix));
     output->dim1 = inputs->dim1; // number of vectors in batch
