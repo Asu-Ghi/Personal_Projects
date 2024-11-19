@@ -142,19 +142,38 @@ void load_iris_data(char* file_path, matrix* X_train, matrix* Y_train, matrix* X
     free(Y_temp.data);
 }
 
-void load_data(const char* filename, double* data, int rows, int cols) {
+void load_data(const char* filename, double* data, int start_row, int end_row, int cols) {
     FILE* file = fopen(filename, "r");
     if (!file) {
         fprintf(stderr, "Error: Could not open file %s\n", filename);
         exit(1);
     }
 
-    // Read data from CSV and store it in the array
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            fscanf(file, "%lf,", &data[i * cols + j]);  // Read each value
+    // Temporary buffer to read lines from the CSV file
+    char line[1024];  // Adjust size depending on expected row size
+
+    // Skip rows before start_row
+    for (int i = 0; i < start_row; i++) {
+        if (!fgets(line, sizeof(line), file)) {
+            fprintf(stderr, "Error: Reached end of file before start_row\n");
+            exit(1);
         }
-        fscanf(file, "\n");  // Move to the next line
+        // Discard the entire line since we are skipping the row
+    }
+
+    // Read data from file into the data array
+    for (int i = start_row; i < end_row; i++) {
+        if (!fgets(line, sizeof(line), file)) {
+            fprintf(stderr, "Error: Reached end of file unexpectedly\n");
+            exit(1);
+        }
+
+        // Tokenize the row to read each column
+        char* token = strtok(line, ",");
+        for (int j = 0; j < cols && token != NULL; j++) {
+            data[i * cols + j] = atof(token);  // Convert token to double and store in the array
+            token = strtok(NULL, ",");  // Get next token
+        }
     }
 
     fclose(file);
@@ -241,6 +260,8 @@ void print_matrix(matrix* M) {
     int m = M->dim1;  // Number of rows
     int n = M->dim2;  // Number of columns
 
+    // Print dim
+    printf("(%d x %d)\n", m, n);    
     // Loop through the rows and columns of the matrix
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
@@ -295,30 +316,15 @@ layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activati
     layer_dense* layer_ = malloc(sizeof(layer_dense));
     layer_->num_inputs = num_inputs;
     layer_->num_neurons = num_neurons;
-    
-    // Allocate memory for layer input and dinput data
-    layer_->inputs = malloc(sizeof(matrix));
-    layer_->inputs->dim1 = batch_size;
-    layer_->inputs->dim2 = num_inputs;
-    layer_->inputs->data = (double*) calloc(layer_->inputs->dim1 * layer_->inputs->dim2, sizeof(double));
-    
-    // Check memory allocation
-    if (layer_->inputs->data == NULL) {
-        fprintf(stderr, "Error in memory allocation for inputs in forward pass.\n");
-        exit(1);
-    }
 
-    // derivative of inputs
-    layer_->dinputs = (matrix*) malloc(sizeof(matrix));
-    layer_->dinputs->dim1 = batch_size;
-    layer_->dinputs->dim2 = num_inputs;
-    layer_->dinputs->data = (double*) calloc(layer_->dinputs->dim1 * layer_->dinputs->dim2, sizeof(double));
+    // point memory to null for vars that are instantiated in forwards
+    layer_->inputs = NULL;
+    layer_->dinputs = NULL;
+    layer_->pre_activation_output = NULL;
+    layer_->post_activation_output = NULL;
 
-    // Check memory allocation
-    if (layer_->dinputs->data == NULL) {
-        fprintf(stderr, "Error in memory allocation for dinputs in forward pass.\n");
-        exit(1);
-    }
+    // init layer id
+    layer_->id = -1;
 
     // Allocate memory for weights
     layer_->weights = (matrix*) malloc(sizeof(matrix));
@@ -344,43 +350,17 @@ layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activati
         exit(1);
     }
 
-    // Allocate memory for pre activation outputs
-    layer_->pre_activation_output = malloc(sizeof(matrix));
-    layer_->pre_activation_output->dim1 = batch_size;
-    layer_->pre_activation_output->dim2 = num_neurons;
-    layer_->pre_activation_output->data = (double*) calloc(layer_->pre_activation_output->dim1*
-                                                    layer_->pre_activation_output->dim2, sizeof(double));
-
-    // Check memory allocation
-    if (layer_->pre_activation_output->data == NULL) {
-        fprintf(stderr, "Error in memory allocation for pre_activation_outputs in forward pass.\n");
-        exit(1);
-    }
-
-    // Allocate memory for post activation outputs
-    layer_->post_activation_output = malloc(sizeof(matrix));
-    layer_->post_activation_output->dim1 = batch_size;
-    layer_->post_activation_output->dim2 = num_neurons;
-    layer_->post_activation_output->data = (double*) calloc(layer_->post_activation_output->dim1*
-                                                    layer_->post_activation_output->dim2, sizeof(double));
-
-    // Check memory allocation
-    if (layer_->post_activation_output->data == NULL) {
-        fprintf(stderr, "Error in memory allocation for post_activation_output in forward pass.\n");
-        exit(1);
-    }
-
     // randomize weights
-    // srand(time(NULL));  // Seed random number with current time
-    srand(42);
+    srand(time(NULL));  // Seed random number with current time
+    // srand(42);
     //  n_inputs x n_neurons matrix
     for (int i = 0; i < num_neurons * num_inputs; i++){
         // Random between -1 and 1 scaled by sqrt(1/n)
         // He initialization
-        // layer_->weights->data[i] = sqrt(1.0 / num_inputs) * ((double)rand() / RAND_MAX * 2.0 - 1.0);  
+        layer_->weights->data[i] = sqrt(1.0 / num_inputs) * ((double)rand() / RAND_MAX * 2.0 - 1.0);  
 
         // Xavier init
-        layer_->weights->data[i] = sqrt(1.0 / (num_inputs + num_neurons)) * ((double)rand() / RAND_MAX * 2.0 - 1.0);
+        // layer_->weights->data[i] = sqrt(1.0 / (num_inputs + num_neurons)) * ((double)rand() / RAND_MAX * 2.0 - 1.0);
 
     }
 
@@ -488,12 +468,17 @@ void free_layer(layer_dense* layer) {
     free(layer->dweights);
     free(layer->dbiases->data);
     free(layer->dbiases);
-    free(layer->dinputs->data);
-    free(layer->dinputs);
-    free(layer->pre_activation_output->data);
-    free(layer->pre_activation_output);
-    free(layer->post_activation_output->data);
-    free(layer->post_activation_output);
+    // If inputs != NULL so do these other variables
+    if (layer->inputs != NULL) {
+        free(layer->inputs->data);
+        free(layer->inputs);
+        free(layer->dinputs->data);
+        free(layer->dinputs);
+        free(layer->pre_activation_output->data);
+        free(layer->pre_activation_output);
+        free(layer->post_activation_output->data);
+        free(layer->post_activation_output);    
+    }
     free(layer->w_velocity->data);
     free(layer->w_velocity);
     free(layer->b_velocity->data);
@@ -503,6 +488,7 @@ void free_layer(layer_dense* layer) {
     free(layer->cache_bias->data);
     free(layer->cache_bias);
     free(layer);
+    layer = NULL;
 }
 
 double calculate_accuracy(matrix* class_targets, layer_dense* final_layer, ClassLabelEncoding encoding) {
@@ -601,6 +587,8 @@ matrix* loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_laye
         // check if one hot is the correct size
         if (last_layer->post_activation_output->dim2 != true_pred->dim2) {
             fprintf(stderr, "Error: Dimension 2 for one hot vectors and predictions do not match.\n");
+            print_matrix(last_layer->post_activation_output);
+            print_matrix(true_pred);
             free(losses->data);
             exit(1);
         }
@@ -809,7 +797,8 @@ void update_params_rmsprop(layer_dense* layer, double* learning_rate, double dec
     }
 }
 
-void update_params_adam (layer_dense* layer, double* learning_rate, double decay_rate, double beta_1, double beta_2, double epsilon, int t) {
+void update_params_adam (layer_dense* layer, double* learning_rate, double decay_rate, double beta_1, 
+                double beta_2, double epsilon, int t, bool correctBias) {
     
     // Check memory allocation for momentums and cache
     if (layer->w_velocity->data == NULL || layer->b_velocity->data == NULL) {
@@ -844,49 +833,66 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
     }
 
     // Apply learning rate decay (if decay factor is specified)
-    if (decay_rate > 0.0) {
+    if (decay_rate > 1e-10) {
         *learning_rate = *learning_rate / (1.0 + decay_rate * t);
     }
 
-    // Update momentum (first moment) with current gradients
-    for (int i = 0; i < layer->weights->dim1 * layer->weights->dim2; i++) {
+    // Weights
+    for (int i = 0; i < layer->dweights->dim1 * layer->dweights->dim2; i++) {
+        // Update Momentum
         layer->w_velocity->data[i] = beta_1 * layer->w_velocity->data[i] + (1.0 - beta_1) * layer->dweights->data[i];
-    }
-
-    for (int i = 0; i < layer->dbiases->dim1 * layer->dbiases->dim2; i++) {
-        layer->b_velocity->data[i] = beta_1 * layer->b_velocity->data[i] + (1.0 - beta_1) * layer->dbiases->data[i];
-    }
-
-    // Correct momentum 
-    for (int i = 0; i < layer->weights->dim1 * layer->weights->dim2; i++) {
-        layer->w_velocity->data[i] = layer->w_velocity->data[i] / (1.0 - pow(beta_1, t + 1)); // Bias correction for momentum
+        
+        // Correct Momentum
+        if (correctBias) {
+            layer->w_velocity->data[i] = layer->w_velocity->data[i] / (1.0 - pow(beta_1, t + 1)); // Bias correction for weights momentum
+        }
 
         // Update cache 
         layer->cache_weights->data[i] = beta_2 * layer->cache_weights->data[i] + (1.0 - beta_2) * layer->dweights->data[i] * layer->dweights->data[i];
+        
+        // Correct cache
+        if (correctBias) {
+            layer->cache_weights->data[i] = layer->cache_weights->data[i] / (1.0 - pow(beta_2, t + 1)); // Bias correction for weight cache
+        }
+
+        // Update Weights using corrected moments and cache
+        layer->weights->data[i] -= (*learning_rate) * layer->w_velocity->data[i] / (sqrt(layer->cache_weights->data[i]) + epsilon);
+
     }
 
-    for (int i = 0; i < layer->biases->dim2; i++) {
-        layer->b_velocity->data[i] = layer->b_velocity->data[i] / (1.0 - pow(beta_1, t + 1)); // Bias correction for bias momentum
+    // Biases
+    for (int i = 0; i < layer->dbiases->dim1 * layer->dbiases->dim2; i++) {
 
+        // Update Momentum
+        layer->b_velocity->data[i] = beta_1 * layer->b_velocity->data[i] + (1.0 - beta_1) * layer->dbiases->data[i];
+        
+        // Correct Momentum
+        if (correctBias) {
+            layer->b_velocity->data[i] = layer->b_velocity->data[i] / (1.0 - pow(beta_1, t + 1)); // Bias correction for bias momentum
+        }
+        
         // Update cache 
         layer->cache_bias->data[i] = beta_2 * layer->cache_bias->data[i] + (1.0 - beta_2) * layer->dbiases->data[i] * layer->dbiases->data[i];
-    }
+        
+        // Correct cache
+        if (correctBias) {
+            layer->cache_bias->data[i] = layer->cache_bias->data[i] / (1.0 - pow(beta_2, t + 1)); // Bias correction for bias cache
+        }
 
-    // Bias correction for cache
-    for (int i = 0; i < layer->weights->dim1 * layer->weights->dim2; i++) {
-        layer->cache_weights->data[i] = layer->cache_weights->data[i] / (1.0 - pow(beta_2, t + 1)); // Bias correction for weight cache
-    }
-
-    for (int i = 0; i < layer->biases->dim2; i++) {
-        layer->cache_bias->data[i] = layer->cache_bias->data[i] / (1.0 - pow(beta_2, t + 1)); // Bias correction for bias cache
-    }
-
-    // Update weights and biases using corrected momenta and cache
-    for (int i = 0; i < layer->weights->dim1 * layer->weights->dim2; i++) {
-        layer->weights->data[i] -= (*learning_rate) * layer->w_velocity->data[i] / (sqrt(layer->cache_weights->data[i]) + epsilon);
-    }
-
-    for (int i = 0; i < layer->biases->dim2; i++) {
+        // Update Bias using corrected moments and cache
         layer->biases->data[i] -= (*learning_rate) * layer->b_velocity->data[i] / (sqrt(layer->cache_bias->data[i]) + epsilon);
+
+    }
+
+}
+
+void clip_gradients(double* gradients, int size, double min_value, double max_value) {
+    for (int i = 0; i < size; i++) {
+        if (gradients[i] < min_value) {
+            gradients[i] = min_value;  // Clipping to the lower bound
+        }
+        if (gradients[i] > max_value) {
+            gradients[i] = max_value;  // Clipping to the upper bound
+        }
     }
 }

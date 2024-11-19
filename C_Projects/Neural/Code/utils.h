@@ -64,7 +64,7 @@ Has matrix data structures that hold layer info
 Includes information for forward and backward passes.
 */
 typedef struct {
-    char* id;
+    int id;
     int num_neurons;
     int num_inputs;
     matrix* weights;
@@ -113,7 +113,7 @@ void load_iris_data(char* file_path, matrix* X_train, matrix* Y_train, matrix* X
 /*
 Loads X data set
 */
-void load_data(const char *filename, double *data, int rows, int cols);
+void load_data(const char *filename, double *data, int start_row, int end_row, int cols);
 
 /*
 Loads Y labels
@@ -247,8 +247,12 @@ For Mini Batch Gradient Descent t is incriminted after every mini batch.
 Beta_1 and Beta_2 are hyperparameters affecting momentum and RMSProp caches respectively. 
 */
 void update_params_adam (layer_dense* layer, double* learning_rate, double decay_rate, 
-                    double beta_1, double beta_2, double epsilon, int t);
+                    double beta_1, double beta_2, double epsilon, int t, bool correctBias);
 
+/*
+Clips gradients to a min and max value, useful if experiencing exploding gradients. Applied in backwards.
+*/
+void clip_gradients(double* gradients, int size, double min_value, double max_value);
 
 
 

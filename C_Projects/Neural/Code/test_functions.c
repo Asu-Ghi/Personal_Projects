@@ -984,7 +984,7 @@ void test_train_nn(){
     class_targets.data = class_target_data;
 
     // Check output
-    train_nn(network, &inputs,&class_targets);
+    // train_nn(network, &inputs,&class_targets);
 
     free_neural_network(network);
     printf("//////////////////////////////////////////////////////\n");

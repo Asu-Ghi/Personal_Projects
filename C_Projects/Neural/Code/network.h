@@ -26,6 +26,7 @@ typedef struct {
     layer_dense** layers; // Layer dense array of layer dense pointers.
     ActivationType* activations_per_layer; // Array of activation type for each layer respectively
     OptimizationType* optimizations_per_layer; // Array of optimization type for each layer respectivley.
+    bool* regularizations_per_layer; // Array of bools determining whether a layer uses regularizations.
     int* num_neurons_in_layer; // Array of num neurons in each layer respectively
     int num_layers; // Number of layers in network
     int batch_size; // Size of input batch
@@ -42,6 +43,9 @@ typedef struct {
     bool debug; // Prints learning vals after each epoch, otherwise just once at the end
     double accuracy; // Stores network accuracy after each epoch
     double loss; // Stores network loss after each epoch
+    double val_accuracy; // Stores network validation accuracy after each epoch
+    double val_loss; // Stores network validation loss after each epoch
+    bool useBiasCorrection; // Flag to determine wheter to use bias correction in ADAM
 } NeuralNetwork;
 
 /*
@@ -60,11 +64,6 @@ Prints information for the neural net.
 void print_nn_info(NeuralNetwork* network);
 
 /*
-Train the neural network
-*/
-void train_nn(NeuralNetwork* network, matrix* X, matrix* Y);
-
-/*
 Forward pass on the neural network
 */
 void forward_pass_nn(NeuralNetwork* network, matrix* inputs);
@@ -80,9 +79,20 @@ Update the parameters of the neural network
 void update_parameters(NeuralNetwork* network);
 
 /*
+Train the neural network
+*/
+void train_nn(NeuralNetwork* network, matrix* X, matrix* Y, matrix* X_validate, matrix* Y_validate);
+
+
+/*
 Predict on the network
 */
 // Function to predict a class label for new data (for classification)
 void predict(NeuralNetwork* network, matrix* input_data);
+
+/*
+Validate a set of outputs on the model
+*/
+void validate_model(NeuralNetwork* network, matrix* validate_data, matrix* validate_pred, double* loss, double* accuracy);
 
 #endif

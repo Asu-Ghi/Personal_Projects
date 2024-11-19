@@ -87,9 +87,14 @@ void backward_reLu(matrix* input_gradients, layer_dense* layer) {
         free(relu_gradients);
         exit(1);
     }
+    // Define max gradient for exploding gradients
+    double max_gradient = 100.0;
 
     // Perform the dot product
     layer->dweights = matrix_mult(inputs_transposed, relu_gradients);
+    // clip_gradients(layer->dweights->data, layer->dweights->dim1 * layer->dweights->dim2, -2, 2);
+
+
 
     // Calculate bias gradients
     // Sum the relu gradients for each example in the batch of inputs
@@ -97,6 +102,30 @@ void backward_reLu(matrix* input_gradients, layer_dense* layer) {
         for(int i = 0; i < relu_gradients->dim1; i++) {
             // sum across rows
             layer->dbiases->data[j] += relu_gradients->data[i * relu_gradients->dim2 + j];
+            if (layer->dbiases->data[j] > max_gradient) {
+                layer->dbiases->data[j] = max_gradient;
+            }
+        }
+    }
+
+    // clip_gradients(layer->dbiases->data, layer->dbiases->dim1 * layer->dbiases->dim2, -2, 2);
+
+    if (layer->useRegularization) {
+        // weights
+        for (int i = 0; i < layer->dweights->dim1 * layer->dweights->dim2; i++) {
+            // L2 gradients
+            layer->dweights->data[i] += 2 * layer->lambda_l2 * layer->weights->data[i];
+
+            // L1 gradients (1 if > 0, -1 if < 0)
+            layer->dweights->data[i] += layer->lambda_l1 * (layer->weights->data[i] >= 0.0 ? 1.0 : -1.0);
+        }
+        // biases
+        for (int i = 0; i < layer->dbiases->dim1 * layer->dbiases->dim2; i++) {
+            // L2 gradients
+            layer->dbiases->data[i] += 2 * layer->lambda_l2 * (layer->biases->data[i]);
+
+            // L1 gradients (1 if > 0, -1 if < 0)
+            layer->dbiases->data[i] += layer->lambda_l1 * (layer->biases->data[i] >= 0 ? 1.0: -1.0);
         }
     }
 
@@ -121,7 +150,12 @@ void backward_reLu(matrix* input_gradients, layer_dense* layer) {
     matrix* output_gradients= matrix_mult(relu_gradients, weights_transposed);
 
     // Copy to dinputs
+
     memcpy(layer->dinputs->data, output_gradients->data, layer->dinputs->dim1 * layer->dinputs->dim2 * sizeof(double));
+
+    // clip_gradients(layer->dinputs->data, layer->dinputs->dim1 * layer->dinputs->dim2, -2, 2);
+
+    // printf("GradientsRELU: %f\n", layer->dinputs->data[0]);
 
     // Final dimensionality check
     if (layer->weights->dim1 != layer->dweights->dim1 || layer->weights->dim2 != layer->dweights->dim2) {
@@ -199,6 +233,7 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
     // printf("----Layer_Outputs(After Activation)---\n");
     // print_matrix(layer->post_activation_output);
 
+
     // Check dimensionality
     if (layer->post_activation_output->dim1 != true_labels->dim1 || layer->post_activation_output->dim2 != true_labels->dim2) {
         fprintf(stderr, "Error: Dimensionality mismatch between true labels and predictions in backwards softmax.\n");
@@ -257,6 +292,8 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
     // Calculate dweights -> dont need to allocate memory as matrix_mult does that.
     layer->dweights = matrix_mult(inputs_T, loss_gradients);
 
+    // clip_gradients(layer->dweights->data, layer->dweights->dim1 * layer->dweights->dim2, -2, 2);
+
     // Calculate layer bias derivatives
 
     // Check memory allocation
@@ -275,6 +312,7 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
             layer->dbiases->data[j] += loss_gradients->data[i * loss_gradients->dim2 + j];
         }
     }
+    // clip_gradients(layer->dbiases->data, layer->dbiases->dim1 * layer->dbiases->dim2, -2, 2);
 
     // Add regularization derivatives to dweights and dbiases
 
@@ -334,6 +372,9 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
 
     // Save to layer data structure
     memcpy(layer->dinputs->data, output_gradients->data, layer->dinputs->dim1 * layer->dinputs->dim2 * sizeof(double));
+
+    // clip_gradients(layer->dinputs->data, layer->dinputs->dim1 * layer->dinputs->dim2, -2, 2);
+
     // Final dimensionality check
     if (layer->weights->dim1 != layer->dweights->dim1 || layer->weights->dim2 != layer->dweights->dim2) {
         fprintf(stderr, "Error. Dimensionality mismatch between dweights and weights in backwards ReLu.\n");
