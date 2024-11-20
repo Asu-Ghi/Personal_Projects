@@ -1,7 +1,7 @@
 #include "network.h"
 
 
-NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epochs, int* num_neurons_in_layer, double learning_rate,
+NeuralNetwork* init_neural_network(int num_layers, int num_epochs, int* num_neurons_in_layer, double learning_rate,
                                    ActivationType* activations, OptimizationType* optimizations, bool* regularizations, int num_batch_features) {
 
     // Allocate memory for the network
@@ -9,7 +9,6 @@ NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epoch
 
     // Initialize network parameters
     n_network->num_layers = num_layers;
-    n_network->batch_size = batch_size;
     n_network->num_features = num_batch_features;
     n_network->learning_rate = learning_rate;
     n_network->decay_rate = 0.0; 
@@ -32,17 +31,21 @@ NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epoch
     n_network->loss_history = (double*) calloc(n_network->num_epochs, sizeof(double));
     n_network->layers = (layer_dense**) malloc(n_network->num_layers * sizeof(layer_dense*));
 
+    // Init dropout rates to 0 on start
+    double* drop_outs = (double*) calloc(n_network->num_layers, sizeof(double));
+    n_network->drop_out_per_layer = drop_outs;
+
     // Allocate memory for the first layer with `num_features`
     n_network->layers[0] = init_layer(num_batch_features, n_network->num_neurons_in_layer[0], 
-                                    n_network->activations_per_layer[0], n_network->optimizations_per_layer[0], n_network->batch_size);
-   
+                                    n_network->activations_per_layer[0], n_network->optimizations_per_layer[0]);
+
     // Adjust layers "useRegularization" variable
     n_network->layers[0]->useRegularization = regularizations[0];
 
     // Allocate memory for hidden layers
     for (int i = 1; i < n_network->num_layers - 1; i++) {
         n_network->layers[i] = init_layer(n_network->layers[i-1]->num_neurons, n_network->num_neurons_in_layer[i], 
-                                     n_network->activations_per_layer[i], n_network->optimizations_per_layer[i], n_network->batch_size);
+                                     n_network->activations_per_layer[i], n_network->optimizations_per_layer[i]);
         // Adjust layers "useRegularization" variable
         n_network->layers[i]->useRegularization = regularizations[i];
 
@@ -50,7 +53,7 @@ NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epoch
 
     // Allocate memory for the output layer
     n_network->layers[num_layers - 1] = init_layer(n_network->layers[num_layers - 2]->num_neurons, n_network->num_neurons_in_layer[num_layers - 1], 
-                                    n_network->activations_per_layer[num_layers-1], n_network->optimizations_per_layer[num_layers-1], n_network->batch_size);
+                                    n_network->activations_per_layer[num_layers-1], n_network->optimizations_per_layer[num_layers-1]);
 
     // Adjust layers "useRegularization" variable
     n_network->layers[num_layers-1]->useRegularization = regularizations[num_layers-1];
@@ -68,6 +71,7 @@ void free_neural_network(NeuralNetwork* network) {
     network->current_epoch = 0;
     free(network->loss_history);
     free(network->layers);
+    free(network->drop_out_per_layer);
     free(network);
     network = NULL;
 }
@@ -102,6 +106,20 @@ void forward_pass_nn(NeuralNetwork* network, matrix* inputs) {
 
     // Last forward pass
     forward_pass(network->layers[network->num_layers - 2]->post_activation_output, network->layers[network->num_layers - 1]);
+}
+
+void pred_forward_pass_nn(NeuralNetwork* network, matrix* inputs) {
+
+    // First forward pass
+    pred_forward_pass(inputs, network->layers[0]);
+
+    // Forward pass for hidden layers
+    for(int i = 1; i < network->num_layers; i++) {
+        pred_forward_pass(network->layers[i - 1]->pred_outputs, network->layers[i]);
+    }
+
+    // Last forward pass
+    pred_forward_pass(network->layers[network->num_layers - 2]->pred_outputs, network->layers[network->num_layers - 1]);
 }
 
 void backward_pass_nn(NeuralNetwork* network, matrix* y_pred) {
@@ -190,10 +208,10 @@ void train_nn(NeuralNetwork* network, matrix* X, matrix* Y, matrix* X_validate, 
         matrix* example_losses = loss_categorical_cross_entropy(Y, network->layers[network->num_layers-1], ONE_HOT);
 
 
-        for (int i = 0; i < network->batch_size; i++) {
+        for (int i = 0; i < Y->dim1; i++) {
             batch_loss+= example_losses->data[i];
         }
-        batch_loss = batch_loss/network->batch_size;
+        batch_loss = batch_loss/Y->dim1;
 
         // Calculate regularization for l1 and l2 
         double regularization_val = 0.0;
@@ -287,21 +305,21 @@ void predict(NeuralNetwork* network, matrix* input_data) {
 
 void validate_model(NeuralNetwork* network, matrix* validate_data, matrix* validate_pred, double* loss, double* accuracy) {
     // Perform a forward pass on validate data
-    forward_pass_nn(network, validate_data);
+    pred_forward_pass_nn(network, validate_data);
 
     // Get loss
     double batch_loss = 0.0;
-    matrix* example_losses = loss_categorical_cross_entropy(validate_pred, network->layers[network->num_layers-1], ONE_HOT);
+    matrix* example_losses = pred_loss_categorical_cross_entropy(validate_pred, network->layers[network->num_layers-1], ONE_HOT);
 
     // Sum all example losses
-    for (int i = 0; i < network->batch_size; i++) {
+    for (int i = 0; i < validate_data->dim1; i++) {
         batch_loss+= example_losses->data[i];
     }
 
     // Get average loss
-    *loss = batch_loss / network->batch_size;
+    *loss = batch_loss / validate_data->dim1;
 
     // Get Accuracy
-    *accuracy = calculate_accuracy(validate_pred, network->layers[network->num_layers-1], ONE_HOT);
+    *accuracy = pred_calculate_accuracy(validate_pred, network->layers[network->num_layers-1], ONE_HOT);
 
 } 

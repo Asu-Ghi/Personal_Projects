@@ -4,6 +4,13 @@
         "string": "c",
         "string_view": "c",
         "vector": "c",
-        "test_functions.h": "c"
+        "test_functions.h": "c",
+        "__debug": "cpp",
+        "exception": "cpp",
+        "new": "cpp",
+        "optional": "cpp",
+        "stdexcept": "cpp",
+        "typeinfo": "cpp",
+        "variant": "cpp"
     }
 }

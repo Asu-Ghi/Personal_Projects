@@ -9,8 +9,7 @@ Interfaces with forward.c, backward.c, utils.c to allow for the creation of a Ne
 
 #ifndef NETWORK_H
 #define NETWORK_H
-#include "forward.h"
-#include "backward.h"
+#include "layer_dense.h"
 
 /*
 Neural Network data structure
@@ -26,6 +25,7 @@ typedef struct {
     layer_dense** layers; // Layer dense array of layer dense pointers.
     ActivationType* activations_per_layer; // Array of activation type for each layer respectively
     OptimizationType* optimizations_per_layer; // Array of optimization type for each layer respectivley.
+    double* drop_out_per_layer; // Array of dropout rates for each layer
     bool* regularizations_per_layer; // Array of bools determining whether a layer uses regularizations.
     int* num_neurons_in_layer; // Array of num neurons in each layer respectively
     int num_layers; // Number of layers in network
@@ -52,7 +52,7 @@ typedef struct {
 /*
 Initializes the Neural Network architechture 
 */
-NeuralNetwork* init_neural_network(int num_layers, int batch_size, int num_epochs, int* num_neurons_in_layer, double learning_rate,
+NeuralNetwork* init_neural_network(int num_layers, int num_epochs, int* num_neurons_in_layer, double learning_rate,
                                    ActivationType* activations, OptimizationType* optimizations, bool* regularizations, int num_features);
 /*
 Frees neural network from memory
