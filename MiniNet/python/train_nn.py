@@ -12,7 +12,7 @@ def create_model(num_layers, num_neurons_in_layer, activations, optimizations,
     regularizations_array = (ctypes.c_bool * num_layers)(*regularizations)
 
     # Call init_neural_network
-    model_ptr = libnn.init_neural_network(
+    model_ptr = libnn.init_neural_network (
         num_layers,
         num_neurons_in_layer_array,
         learning_rate,
@@ -23,10 +23,13 @@ def create_model(num_layers, num_neurons_in_layer, activations, optimizations,
     )
 
     return model_ptr
+    ctypes.POINTER(NeuralNetwork), # Network
+    ctypes.c_int, # Num Epochs
+    ctypes.POINTER(matrix), # Training data
+    ctypes.POINTER(matrix), # True Training Lables
+    ctypes.POINTER(matrix), # Validate Data
+    ctypes.POINTER(matrix) # Validate labels
 
-
-def train_model():
-    pass
 
 def main():
     batch_size = 64
@@ -40,8 +43,14 @@ def main():
     regularizations = [True, False, True]
     num_batch_features = 32
 
-    create_model(num_layers, num_neurons_in_layer, activations, optimizations, regularizations,
+    model_ptr = create_model(num_layers, num_neurons_in_layer, activations, optimizations, regularizations,
                 num_batch_features, learning_rate)
+    
+    libnn.train_nn(model_ptr
+
+        
+    )
+
 
     
 if __name__ == "__main__":

@@ -1,12 +1,3 @@
-/*
-Asu Ghimire
-11/17/2024
-
-Network "Class".
-Interfaces with forward.c, backward.c, utils.c to allow for the creation of a Neural Network.
-
-*/
-
 #ifndef NETWORK_H
 #define NETWORK_H
 #include "layer_dense.h"
