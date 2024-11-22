@@ -1,7 +1,6 @@
 #include "network.h"
 
-
-NeuralNetwork* init_neural_network(int num_layers, int num_epochs, int* num_neurons_in_layer, double learning_rate,
+NeuralNetwork* init_neural_network(int num_layers, int* num_neurons_in_layer, double learning_rate,
                                    ActivationType* activations, OptimizationType* optimizations, bool* regularizations, int num_batch_features) {
 
     // Allocate memory for the network
@@ -12,7 +11,7 @@ NeuralNetwork* init_neural_network(int num_layers, int num_epochs, int* num_neur
     n_network->num_features = num_batch_features;
     n_network->learning_rate = learning_rate;
     n_network->decay_rate = 0.0; 
-    n_network->num_epochs = num_epochs;
+    n_network->num_epochs = 100; // by default
     n_network->activations_per_layer = activations; 
     n_network->optimizations_per_layer = optimizations;
     n_network->regularizations_per_layer = regularizations;
@@ -89,9 +88,16 @@ void print_nn_info(NeuralNetwork* network) {
     printf("BETA_1 (MOMENTUMS): %f\n", network->beta_1);
     printf("BETA_2 (RMSPROP CACHES): %f\n", network->beta_2);
     printf("EPSILON: %.8f\n", network->epsilon);
-    printf("#############################################\n");
-    printf("#############################################\n");
 
+    if (network->useBiasCorrection){
+        printf("USING BIAS CORRECTION(ADAM)\n");
+    }
+    else {
+        printf("NOT USING BIAS CORRECTION(ADAM)\n");
+    }
+
+    printf("#############################################\n");
+    printf("#############################################\n");
 }
 
 void forward_pass_nn(NeuralNetwork* network, matrix* inputs) {
@@ -125,11 +131,24 @@ void pred_forward_pass_nn(NeuralNetwork* network, matrix* inputs) {
 void backward_pass_nn(NeuralNetwork* network, matrix* y_pred) {
 
     // Start with the backward pass for softmax and loss
-    backwards_softmax_and_loss(y_pred, network->layers[network->num_layers-1]);
+    if (network->layers[network->num_layers-1]->activation == SOFTMAX) {
+        backwards_softmax_and_loss(y_pred, network->layers[network->num_layers-1]);
+    }
+    else {
+        printf("Not handled.\n");
+        exit(1);
+    }
 
     // Go backwards through every hidden layer
     for (int i = network->num_layers - 2; i >= 0; i--) {
-        backward_reLu(network->layers[i+1]->dinputs, network->layers[i]);
+
+        if (network->layers[i]->activation == RELU){
+            backward_reLu(network->layers[i+1]->dinputs, network->layers[i]);
+        }
+        else {
+            printf("Not handled.\n");
+            exit(1);
+        }
     }
     
 }
@@ -137,47 +156,15 @@ void backward_pass_nn(NeuralNetwork* network, matrix* y_pred) {
 void update_parameters(NeuralNetwork* network) {
     // Loop through the first and all hidden layers
     for (int i = 0; i < network->num_layers; i++) {
-
-        // Update weights and biases for each layer(currently uses SGD)
-
-        // If using momentum SGD
-        if (network->layers[i]->optimization == SGD_MOMENTUM) {
-            update_params_sgd_momentum(network->layers[i], &network->learning_rate, network->current_epoch, network->decay_rate,
-                                        network->beta_1);
-        }
-        // If using SGD without momentum
-        else if (network->layers[i]->optimization == SGD) {
-            update_params_sgd(network->layers[i], &network->learning_rate, network->current_epoch, network->decay_rate);
-        }
-
-        // If using ADA GRAD
-        else if (network->layers[i]->optimization == ADA_GRAD) {
-            update_params_adagrad(network->layers[i], &network->learning_rate, network->decay_rate, network->epsilon);
-        }
-
-        // If using RMS PROP
-        else if (network->layers[i]->optimization == RMS_PROP) {
-            update_params_rmsprop(network->layers[i], &network->learning_rate, network->decay_rate, network->epsilon);
-
-        }
-
-        // If using ADAM
-        else if (network->layers[i]->optimization == ADAM) {
-            update_params_adam(network->layers[i], &network->learning_rate, network->decay_rate, network->beta_1, 
-                                network->beta_2, network->epsilon, network->current_epoch, network->useBiasCorrection);
-        }
-
-        // Error handling
-        else {
-            fprintf(stderr, "Error: Incorrect Optimization Entered.\n");
-            free_neural_network(network);
-            exit(1);
-        }
-        
+        // Optimize layer
+        optimization_dense(network->layers[i], &network->learning_rate, network->decay_rate, network->current_epoch,
+                            network->beta_1, network->beta_2, network->epsilon, network->useBiasCorrection);
     }   
 }
 
-void train_nn(NeuralNetwork* network, matrix* X, matrix* Y, matrix* X_validate, matrix* Y_validate) {
+void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matrix* X_validate, matrix* Y_validate) {
+    // Set num epochs
+    network->num_epochs = num_epochs;
     // Print layer optimizations (if debug = true)
     if (network->debug) {
         for (int i = 0; i < network->num_layers; i++) {
@@ -194,6 +181,14 @@ void train_nn(NeuralNetwork* network, matrix* X, matrix* Y, matrix* X_validate, 
     // best val loss for training
     double best_val_loss = DBL_MAX;
 
+    // DEBUGING TIME
+    double backward_time = 0.0;
+    double forward_time = 0.0;
+    double optimization_time = 0.0;
+    double accuracy_time = 0.0;
+    double loss_time = 0.0;
+    double regularization_time = 0.0;
+    double validate_time = 0.0;
     // Epoch Iterations
     for (int epoch = 0; epoch < network->num_epochs; epoch++) {
         // reset batch loss
@@ -201,10 +196,18 @@ void train_nn(NeuralNetwork* network, matrix* X, matrix* Y, matrix* X_validate, 
         // reset accuracy
         accuracy = 0.0;
         // Step 1: Forward Pass
+        double forward_start_time = omp_get_wtime();
         forward_pass_nn(network, X);
+        double forward_end_time = omp_get_wtime();
+        forward_time += (forward_end_time - forward_start_time);
 
         // Step 2: Calculate Loss and Accuracy
+        double accuracy_start_time = omp_get_wtime();
         accuracy = calculate_accuracy(Y, network->layers[network->num_layers-1], ONE_HOT);
+        double accuracy_end_time = omp_get_wtime();
+        accuracy_time += (accuracy_end_time - accuracy_start_time);
+
+        double loss_start_time = omp_get_wtime();
         matrix* example_losses = loss_categorical_cross_entropy(Y, network->layers[network->num_layers-1], ONE_HOT);
 
 
@@ -212,12 +215,17 @@ void train_nn(NeuralNetwork* network, matrix* X, matrix* Y, matrix* X_validate, 
             batch_loss+= example_losses->data[i];
         }
         batch_loss = batch_loss/Y->dim1;
+        double loss_end_time = omp_get_wtime();
+        loss_time += (loss_end_time - loss_start_time);
 
         // Calculate regularization for l1 and l2 
+        double regularization_start_time = omp_get_wtime();
         double regularization_val = 0.0;
         for (int i = 0; i < network->num_layers; i++) {
             regularization_val += calculate_regularization_loss(network->layers[i]);
         } 
+        double regularization_end_time = omp_get_wtime();
+        regularization_time += (regularization_end_time - regularization_start_time);
 
         // Sum regularization to loss
         batch_loss += regularization_val;
@@ -226,10 +234,16 @@ void train_nn(NeuralNetwork* network, matrix* X, matrix* Y, matrix* X_validate, 
         network->loss_history[epoch] = batch_loss;
 
         // Step 3: Backward Pass
+        double backward_start_time = omp_get_wtime();
         backward_pass_nn(network, Y);
+        double backward_end_time = omp_get_wtime();
+        backward_time += (backward_end_time - backward_start_time);
 
         // Step 4: Update Weights
+        double optimization_start_time = omp_get_wtime();
         update_parameters(network);
+        double optimization_end_time = omp_get_wtime();
+        optimization_time += (optimization_end_time - optimization_start_time);
 
         // Step 5: Update current epoch (for learning rate decay)
         network->current_epoch += 1;
@@ -240,9 +254,12 @@ void train_nn(NeuralNetwork* network, matrix* X, matrix* Y, matrix* X_validate, 
 
         // Validate Network every 50 epochs
         if (epoch % 50 == 0) {
+            double validate_start_time = omp_get_wtime();
             validate_model(network, X_validate, Y_validate, &val_loss, &val_accuracy);
             network->val_accuracy = val_accuracy;
             network->val_loss = val_loss;
+            double validate_end_time = omp_get_wtime();
+            validate_time += (validate_end_time - validate_start_time);
         }
         
         // Print training data (if debug = TRUE)
@@ -258,7 +275,16 @@ void train_nn(NeuralNetwork* network, matrix* X, matrix* Y, matrix* X_validate, 
     }
     // Print Final Accuracy
     printf("Epoch %d: Loss = %f, Accuracy = %f, LR = %f \n", network->current_epoch, batch_loss, accuracy, network->learning_rate);
-  
+    
+    // Print time debugs
+    printf("forward time = %f\n", forward_time / network->num_epochs);
+    printf("validate time = %f\n", validate_time / (network->num_epochs / 50));
+    printf("accuracy time = %f\n", accuracy_time / network->num_epochs);
+    printf("loss time = %f\n", loss_time / network->num_epochs);
+    printf("backward time = %f\n", backward_time / network->num_epochs);
+    printf("regularization loss time = %f\n", regularization_time / network->num_epochs);
+    printf("optimization time = %f\n", optimization_time / network->num_epochs);
+
 }
 
 void predict(NeuralNetwork* network, matrix* input_data) {
@@ -321,5 +347,5 @@ void validate_model(NeuralNetwork* network, matrix* validate_data, matrix* valid
 
     // Get Accuracy
     *accuracy = pred_calculate_accuracy(validate_pred, network->layers[network->num_layers-1], ONE_HOT);
-
 } 
+

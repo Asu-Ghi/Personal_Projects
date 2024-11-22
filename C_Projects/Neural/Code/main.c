@@ -3,81 +3,7 @@
 
 #define NUM_FEATURES 4
 #define NUM_CLASSES 3
-#define NUM_THREADS 8
-/*
-Convert spiral data one hot
-*/
-matrix convert_spiral_labels(matrix* y, int num_classes) {
-    matrix y_return;
-    y_return.dim1 = y->dim1;
-    y_return.dim2 = num_classes;
-    y_return.data = calloc(y_return.dim1*y_return.dim2,sizeof(double));
-
-    // Check memory allocation
-    if (!y_return.data) {
-        fprintf(stderr, "Memory allocation failed in convert spiral labels.\n");
-        exit(1);
-    }
-
-    for (int i = 0; i < y->dim1; i++) {
-        int label = y->data[i];
-        if(label < num_classes && label >= 0) {
-            // Create one hot
-            y_return.data[i * y_return.dim2 + label] = 1.0;
-        }
-    }
-    return y_return;
-}
-
-/*
-Find best LR
-*/
-void find_best_lr(NeuralNetwork* network, matrix* x, matrix* y_pred, int num_epochs, double init_lr, int max_lr, double lambda1,
-                    double lambda2, double beta_1, double beta_2, double epsilon, double lr_factor, double decay_rate,
-                    matrix* X_test, matrix* Y_test) {
-    int num_features = network->num_features;
-    int* num_neurons_in_layer = network->num_neurons_in_layer;
-    ActivationType* activations_in_layer = network->activations_per_layer;
-    OptimizationType* optimizations_in_layer = network->optimizations_per_layer;
-    bool* regularization_per_layer = network->regularizations_per_layer;
-    int num_layers = network->num_layers;
-    double best_acc = 0.0;
-    double best_lr = 0.0;
-    int iter = 0;
-
-    while (init_lr < max_lr) {
-        // Free network after training
-        free_neural_network(network);
-
-        // Re init network with new parameters
-        network = init_neural_network(num_layers, num_epochs, num_neurons_in_layer, init_lr,
-                                            activations_in_layer, optimizations_in_layer, regularization_per_layer, num_features);
-
-        network->momentum = true; // set sgd optimization to use momentum calculations
-        network->decay_rate = decay_rate;
-        network->debug = false;
-        network->useBiasCorrection = false; // set adam optimization to not correct bias
-
-        // retrain
-        train_nn(network, x, y_pred, X_test, Y_test);
-
-        // update best lr based on acc
-        if (network->accuracy > best_acc) {
-            best_lr = network->learning_rate;
-            best_acc = network->val_accuracy;
-        }
-
-        // Debug
-        printf("Iter: %d, Initial: LR %f \n", iter, network->learning_rate);
-        printf("Validate Loss = %f, Validate Acc = %f\n", network->val_loss, network->val_accuracy);
-
-        init_lr *= lr_factor;
-
-        iter++;
-    }
-
-    printf("Best learning rate = %f, Best Acc = %f\n", best_lr, best_acc);
-}
+#define NUM_THREADS 6
 
 /*
 Find best betas for optimization
@@ -104,11 +30,11 @@ int main(int argc, char** argv) {
     // Load spiral data
     // Init training
     matrix spiral_train, spiral_pred, spiral_test, spiral_test_pred;
-    spiral_train.dim1 = 300;
+    spiral_train.dim1 = 500;
     spiral_train.dim2 = 2;
     spiral_train.data = (double*) calloc(spiral_train.dim1 * spiral_train.dim2, sizeof(double));
 
-    spiral_pred.dim1 = 300;
+    spiral_pred.dim1 = 500;
     spiral_pred.dim2 = 3;
     spiral_pred.data = (double*) calloc(spiral_pred.dim1 * spiral_pred.dim2, sizeof(double));
 
@@ -122,53 +48,71 @@ int main(int argc, char** argv) {
     spiral_test_pred.data = (double*) calloc(spiral_test_pred.dim1 * spiral_test_pred.dim2, sizeof(double));
 
     // Load training
-    load_data("../DataSets/Spiral/train_data.csv", spiral_train.data, 0, 300, 2);
-    load_data("../DataSets/Spiral/train_labels.csv", spiral_pred.data, 0, 300, 3);
+    // load_data("../DataSets/Spiral/train_data.csv", spiral_train.data, 0, 300, 2);
+    // load_data("../DataSets/Spiral/train_labels.csv", spiral_pred.data, 0, 300, 3);
+
+    load_data("../DataSets/Spiral/train_data_1000.csv", spiral_train.data, 0, 500, 2);
+    load_data("../DataSets/Spiral/train_labels_1000.csv", spiral_pred.data, 0, 500, 3);
+
 
     // Load validating
     load_data("../DataSets/Spiral/test_data.csv", spiral_test.data, 0, 100, 2);
     load_data("../DataSets/Spiral/test_labels.csv", spiral_test_pred.data, 0, 100, 3);
 
-    int spiral_num_batches = 300;
     int spiral_num_features = 2;
-    int spiral_neurons_in_layer[3] = {512, 512, 3}; // Num neurons in a layer
-    ActivationType spiral_activations_per_layer[3] = {RELU, RELU, SOFTMAX}; // size num layers
-    OptimizationType spiral_optimizations_per_layer[3] = {ADAM, ADAM, ADAM}; // size num layers
-    bool spiral_regularization_per_layer[3] = {true,true, true}; // size num layers
+    int spiral_neurons_in_layer[2] = {512, 3}; // Num neurons in a layer
+    ActivationType spiral_activations_per_layer[2] = {RELU, SOFTMAX}; // size num layers
+    OptimizationType spiral_optimizations_per_layer[2] = {ADAM, ADAM}; // size num layers
+    bool spiral_regularization_per_layer[2] = {true, true}; // size num layers
 
     // Find best lr
-    int num_epochs = 1000;
-    double init_lr = .05;
-    double decay_rate = 1e-5;
+    int num_epochs = 3000;
+    double init_lr = 1e-4;
+    double decay_rate = 1e-7;
     int max_lr = 1;
     double lr_factor = 1.01;
     double epsilon = 1e-6;
-    double beta_1 = 0.9; // Momentums
-    double beta_2 = 0.999; // RMS PROP CACHE
+    double beta_1 = 0.8; // Momentums
+    double beta_2 = 0.9; // RMS PROP CACHE
     double lambda1 = 1e-6;
     double lambda2 = 1e-5;
 
-    NeuralNetwork* network_spiral = init_neural_network(3, num_epochs, spiral_neurons_in_layer, init_lr,
+    NeuralNetwork* network_spiral = init_neural_network(2, spiral_neurons_in_layer, init_lr,
                                             spiral_activations_per_layer, spiral_optimizations_per_layer, spiral_regularization_per_layer, spiral_num_features);
     
     network_spiral->layers[0]->lambda_l1 = lambda1;
     network_spiral->layers[0]->lambda_l2 = lambda2;
+    network_spiral->beta_1 = beta_1;
+    network_spiral->beta_2 = beta_2;
+    network_spiral->epsilon = epsilon;
 
-    network_spiral->layers[1]->lambda_l1 = lambda1;
-    network_spiral->layers[1]->lambda_l2 = lambda2;
-    network_spiral->layers[0]->drop_out_rate = 0.3;
-    network_spiral->decay_rate = decay_rate;
-    // network_spiral->layers[1]->drop_out_rate = 0.3;
+    // network_spiral->layers[1]->lambda_l1 = lambda1;
+    // network_spiral->layers[1]->lambda_l2 = lambda2;
 
     // network_spiral->layers[2]->lambda_l1 = lambda1;
     // network_spiral->layers[2]->lambda_l2 = lambda2;
-    
+
     // network_spiral->layers[3]->lambda_l1 = lambda1;
     // network_spiral->layers[3]->lambda_l2 = lambda2;
 
-    print_nn_info(network_spiral);
-    network_spiral->useBiasCorrection = false; // works way better with adam for this dataset
-    train_nn(network_spiral, &spiral_train, &spiral_pred, &spiral_test, &spiral_test_pred);
+    network_spiral->layers[0]->drop_out_rate = .4;
+    // network_spiral->layers[1]->drop_out_rate = 0.3;
+    // network_spiral->layers[2]->drop_out_rate = 0.3;
+    // network_spiral->layers[3]->drop_out_rate = 0.3;
+
+
+    network_spiral->layers[0]->clip_value = 1.5;
+    // network_spiral->layers[1]->clip_value = 1;
+    // network_spiral->layers[2]->clip_value = 1;
+    // network_spiral->layers[3]->clip_value = 1;
+
+
+    network_spiral->decay_rate = decay_rate;
+
+    // print_nn_info(network_spiral);
+    network_spiral->debug = true;
+    network_spiral->useBiasCorrection = true; // works way better with adam for this dataset
+    train_nn(network_spiral, num_epochs, &spiral_train, &spiral_pred, &spiral_test, &spiral_test_pred);
 
     // find_best_lr(network_spiral, &spiral_train, &spiral_pred, num_epochs,init_lr, max_lr,
     //                          lambda1, lambda2, beta_1, beta_2, epsilon, lr_factor, decay_rate, &spiral_test, &spiral_test_pred);

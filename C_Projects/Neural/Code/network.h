@@ -52,7 +52,7 @@ typedef struct {
 /*
 Initializes the Neural Network architechture 
 */
-NeuralNetwork* init_neural_network(int num_layers, int num_epochs, int* num_neurons_in_layer, double learning_rate,
+NeuralNetwork* init_neural_network(int num_layers, int* num_neurons_in_layer, double learning_rate,
                                    ActivationType* activations, OptimizationType* optimizations, bool* regularizations, int num_features);
 /*
 Frees neural network from memory
@@ -82,7 +82,7 @@ void update_parameters(NeuralNetwork* network);
 /*
 Train the neural network
 */
-void train_nn(NeuralNetwork* network, matrix* X, matrix* Y, matrix* X_validate, matrix* Y_validate);
+void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matrix* X_validate, matrix* Y_validate);
 
 
 /*
@@ -95,5 +95,6 @@ void predict(NeuralNetwork* network, matrix* input_data);
 Validate a set of outputs on the model
 */
 void validate_model(NeuralNetwork* network, matrix* validate_data, matrix* validate_pred, double* loss, double* accuracy);
+
 
 #endif

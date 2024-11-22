@@ -7,16 +7,21 @@ Author: Asutosh Ghimire
 
 //////////////////////////////////////////////////// MISC METHODS ///////////////////////////////////////////////////////////////////////////
 
-void clip_gradients(double* gradients, int size, double min_value, double max_value) {
-    for (int i = 0; i < size; i++) {
-        if (gradients[i] < min_value) {
-            gradients[i] = min_value;  // Clipping to the lower bound
-        }
-        if (gradients[i] > max_value) {
-            gradients[i] = max_value;  // Clipping to the upper bound
-        }
+void clip_gradients(matrix* gradients, double clip_value) {
+
+    // Calculate l2 norm for gradients 
+    double norm = vector_dot_product(gradients, gradients); // already supports parallel
+    // normalize the dot product
+    norm = sqrt(norm);
+    // if norm > clip value, scale gradients
+    if (norm > clip_value) {
+        // scale each gradient by the ratio of clip_value / norm
+        double scaling_factor = clip_value / norm;
+        // scale gradients by factor
+        matrix_scalar_mult(gradients, scaling_factor); // already supports parallel
     }
 }
+
 
 void apply_drop_out(layer_dense* layer, double drop_out_rate) {
 
@@ -35,18 +40,63 @@ void apply_drop_out(layer_dense* layer, double drop_out_rate) {
 
     }
 
+#ifdef ENABLE_PARALLEL
+int rows_output = layer->post_activation_output->dim1;
+int cols_output = layer->post_activation_output->dim2;
+
+#pragma omp parallel
+{
+    unsigned int seed = omp_get_thread_num();  // Generate a unique seed per thread
+    int thread_id = omp_get_thread_num(); // Get current thread id
+    int total_threads = omp_get_num_threads(); // Get total num threads
+    int rows_per_thread = (rows_output + total_threads - 1) / total_threads; // Get num rows to calc per each thread
+    int start_row = rows_per_thread * thread_id; // Get start row for unique thread
+    int end_row = rows_per_thread * thread_id + rows_per_thread; // Get end row for unique thread
+
+    // Check to see if in bounds of thread calculations
+    if (end_row > rows_output) {
+        end_row = rows_output;
+    }
     // Iterate through every batch example in layer output
-    #pragma omp parallel for schedule(dynamic)
+    for (int i = start_row; i < end_row; i++) {
+        // Iterate through every neuron 
+        for (int j = 0; j < cols_output; j++) {
+
+            // Generate random num between 0 and 1
+            double r = (double)rand_r(&seed) / RAND_MAX;
+
+            // If less than drop out rate, drop neuron output
+            if (r < drop_out_rate) {
+                layer->post_activation_output->data[i * cols_output + j] = 0;
+                layer->binary_mask->data[i * cols_output + j] = 0;
+            }
+
+            // Scale output by 1/(1- drop_out_rate)
+            else {
+                layer->post_activation_output->data[i * cols_output + j] /= (1-drop_out_rate);
+                layer->binary_mask->data[i * cols_output + j] = 1 / drop_out_rate;
+            }
+        }
+    }
+
+}
+
+#else
+    unsigned int seed = time(NULL);
+
     for (int i = 0; i < layer->post_activation_output->dim1; i++) {
         // Iterate through every neuron 
         for (int j = 0; j < layer->post_activation_output->dim2; j++) {
+
             // Generate random num between 0 and 1
-            double r = (double)rand() / RAND_MAX;
+            double r = (double)rand_r(&seed) / RAND_MAX;
+
             // If less than drop out rate, drop neuron output
             if (r < drop_out_rate) {
                 layer->post_activation_output->data[i * layer->post_activation_output->dim2 + j] = 0;
                 layer->binary_mask->data[i * layer->post_activation_output->dim2 + j] = 0;
             }
+            
             // Scale output by 1/(1- drop_out_rate)
             else {
                 layer->post_activation_output->data[i * layer->post_activation_output->dim2 + j] /= (1-drop_out_rate);
@@ -54,6 +104,8 @@ void apply_drop_out(layer_dense* layer, double drop_out_rate) {
             }
         }
     }
+
+#endif
 }
 
 layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activation, OptimizationType optimization) {
@@ -77,6 +129,9 @@ layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activati
 
     // init layer id
     layer_->id = -1;
+
+    // initi clip val to 0
+    layer_->clip_value = 0;
 
     // Allocate memory for weights
     layer_->weights = (matrix*) malloc(sizeof(matrix));
@@ -103,8 +158,8 @@ layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activati
     }
 
     // randomize weights
-    srand(time(NULL));  // Seed random number with current time
-    // srand(42);
+    // srand(time(NULL));  // Seed random number with current time
+    srand(42);
     //  n_inputs x n_neurons matrix
     for (int i = 0; i < num_neurons * num_inputs; i++){
         // Random between -1 and 1 scaled by sqrt(1/n)
@@ -143,9 +198,6 @@ layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activati
 
     // Initialize binary mask to NULL (init in apply dropout)
     layer_->binary_mask = NULL;
-
-    // Init clip gradients to false
-    layer_->clipGradients = false;
 
     // Init lambda for regularization
     layer_->lambda_l1 = 0.001;
@@ -402,7 +454,6 @@ double pred_calculate_accuracy(matrix* class_targets, layer_dense* final_layer, 
 
     // calculate and return accuracy
     double accuracy = (1.0)*correct_count / num_samples;
-
     return(accuracy);
 }
 
@@ -624,14 +675,12 @@ double calculate_regularization_loss(layer_dense* layer) {
     double l2_b = 0.0; // L2 bias regularization
 
     // Weight regularization L1 and L2
-    #pragma omp for schedule(dynamic)  // Paralellize it (schedule dynamic helps allocate resources)
     for (int i = 0; i < layer->weights->dim1 * layer->weights->dim2; i++) {
         l1_w += fabs(layer->weights->data[i]);
         l2_w += layer->weights->data[i] * layer->weights->data[i];
     }
 
     // Bias regularization L1 and L2
-    #pragma omp for schedule(dynamic)  // Paralellize it (schedule dynamic helps allocate resources)
     for (int i = 0; i <layer->biases->dim1 * layer->biases->dim2; i++) {
         l1_b += fabs(layer->biases->data[i]);
         l2_b += layer->biases->data[i] * layer->biases->data[i];
@@ -709,18 +758,6 @@ void forward_pass(matrix* inputs, layer_dense* layer) {
             exit(1);
         }
     }
-  
-    // Allocate output memory
-    matrix* output = malloc(sizeof(matrix));
-    output->dim1 = inputs->dim1; // number of vectors in batch
-    output->dim2 = layer->weights->dim2; // number of neurons in weights
-    output->data = (double*) calloc(output->dim1  * output->dim2, sizeof(double));
-
-    // Check memory allocation
-    if (output->data == NULL) {
-        fprintf(stderr, "Error in matrix mult for forward pass.\n");
-        exit(1); 
-    }
 
     /* 
     num_inputs x num_neurons
@@ -732,28 +769,26 @@ void forward_pass(matrix* inputs, layer_dense* layer) {
     // Add biases for the layer to the batch output data
     // batch_size x num_neurons, where output dim1 -> batch size
 
-    #pragma omp for collapse(2) schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
-    for (int i = 0; i < output->dim1; i++) {
+    // #pragma omp for collapse(2) schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
+    for (int i = 0; i < layer->pre_activation_output->dim1; i++) {
         // output dim2-> num neurons
-        for (int j = 0; j < output->dim2; j++) {
-            output->data[i * output->dim2 + j] = mult_matrix->data[i * output->dim2 + j] + layer->biases->data[j];
+        for (int j = 0; j < layer->pre_activation_output->dim2; j++) {
+            layer->pre_activation_output->data[i * layer->pre_activation_output->dim2 + j] = mult_matrix->data[i * layer->pre_activation_output->dim2 + j] + layer->biases->data[j];
         }
     }
 
-    // Update pre activation outputs
-    memcpy(layer->pre_activation_output->data,  output->data, output->dim1 * output->dim2 * sizeof(double));
-
     // relu activation
     if (layer->activation == RELU) {
-        forward_reLu(output);
+        forward_reLu(layer->pre_activation_output);
     } 
     // softmax activation
     else if(layer->activation == SOFTMAX) {
-        forward_softMax(output);
+        forward_softMax(layer->pre_activation_output);
     }
 
     // Update post activation outputs
-    memcpy(layer->post_activation_output->data,  output->data, output->dim1 * output->dim2 * sizeof(double));
+    memcpy(layer->post_activation_output->data,  layer->pre_activation_output->data, layer->pre_activation_output->dim1 * 
+                            layer->pre_activation_output->dim2 * sizeof(double));
 
     // Apply dropout
     if (layer->drop_out_rate > 0.0) {
@@ -761,8 +796,6 @@ void forward_pass(matrix* inputs, layer_dense* layer) {
     }
 
     // Free unused memory
-    free(output->data);
-    free(output);
     free(mult_matrix->data);
     free(mult_matrix);
 }
@@ -808,7 +841,7 @@ void pred_forward_pass(matrix* inputs, layer_dense* layer) {
     matrix* z = matrix_mult(inputs, layer->weights);
 
     // Add biases
-    #pragma omp for collapse(2) schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
+    // #pragma omp for collapse(2) schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
     for (int i = 0; i < layer->pred_outputs->dim1; i++) {
         for (int j = 0; j < layer->pred_outputs->dim2; j++) {
             layer->pred_outputs->data[i * layer->pred_outputs->dim2 + j] = z->data[i * layer->pred_outputs->dim2 + j] + layer->biases->data[j];
@@ -830,7 +863,7 @@ void pred_forward_pass(matrix* inputs, layer_dense* layer) {
 void forward_reLu(matrix* batch_input) {
     // iterate through every point in the batch input
 
-    #pragma omp for schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
+    // #pragma omp for schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
     for (int i = 0; i < batch_input->dim1 * batch_input->dim2; i++){
 
         // if the input value is <= 0, rectify it to 0 (otherwise, leave it unchanged)
@@ -842,7 +875,7 @@ void forward_reLu(matrix* batch_input) {
 
 void forward_softMax(matrix* batch_input) {
     // iterate over the batch
-    #pragma omp for schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
+    // #pragma omp for schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
     for(int i = 0; i < batch_input -> dim1; i++) {
 
         //step 1: Subtract maximum value from each value in the input batch to ensure numerical stability (no large exponentiations)
@@ -894,14 +927,7 @@ void backward_reLu(matrix* input_gradients, layer_dense* layer) {
     }
 
     // Iterate through every value in layer post activation output to get relu gradients
-    for (int i = 0; i < layer->pre_activation_output->dim1 * layer->pre_activation_output->dim2; i++) {
-        if (layer->pre_activation_output->data[i] >= 0) {
-            relu_gradients->data[i] = 1;
-        }
-        else {
-            relu_gradients->data[i] = 0;
-        }
-    }
+    calculate_relu_gradients(relu_gradients, layer); // supports parallel
 
     // Check dimensions for element by element multiplication of input gradients and relu gradients.
     if (input_gradients->dim1 != relu_gradients->dim1 || input_gradients->dim2 != relu_gradients->dim2) {
@@ -912,14 +938,10 @@ void backward_reLu(matrix* input_gradients, layer_dense* layer) {
         exit(1);
     }
 
-    // Element by element mult of input gradients and relu gradients
-    #pragma omp for collapse(2) schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
-    for(int i = 0; i < relu_gradients->dim1; i++) {
-        for (int j = 0; j < relu_gradients->dim2; j++) {
-            relu_gradients->data[i * relu_gradients->dim2 + j] = relu_gradients->data[i * relu_gradients->dim2 + j] * 
-            input_gradients->data[i * relu_gradients->dim2 + j];
-        }
-    }
+    // Element by element mult of input gradients and relu gradients, free relu gradients after 
+    matrix* relu_and_input_grads = element_matrix_mult(relu_gradients, input_gradients); // supports parallel
+    free(relu_gradients->data);
+    free(relu_gradients);
 
     /*
     Find Gradient of the Weights and Biases of the layer.
@@ -935,58 +957,32 @@ void backward_reLu(matrix* input_gradients, layer_dense* layer) {
     matrix* inputs_transposed = transpose_matrix(layer->inputs);
 
     // Check dimensions
-    if(inputs_transposed->dim2 != relu_gradients-> dim1) {
+    if(inputs_transposed->dim2 != relu_and_input_grads-> dim1) {
         fprintf(stderr, "Error: Dimensionality mismatch between inputs_transposed and relu_gradients in weight calculation.\n");
         free(inputs_transposed);
-        free(relu_gradients);
+        free(relu_and_input_grads);
         exit(1);
     }
-    // Define max gradient for exploding gradients
-    double max_gradient = 100.0;
 
     // Perform the dot product
-    layer->dweights = matrix_mult(inputs_transposed, relu_gradients);
+    layer->dweights = matrix_mult(inputs_transposed, relu_and_input_grads); // supports parallel
 
     // If clipping gradients, apply
-    if (layer->clipGradients) {
-        clip_gradients(layer->dweights->data, layer->dweights->dim1 * layer->dweights->dim2, -1, 1);
+    if (layer->clip_value > 0) {
+        clip_gradients(layer->dweights, layer->clip_value); // supports parallel
     }
 
-    // Calculate bias gradients
     // Sum the relu gradients for each example in the batch of inputs
-    #pragma omp for collapse(2) schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
-    for (int j = 0; j < layer->dbiases->dim2; j++) {
-        for(int i = 0; i < relu_gradients->dim1; i++) {
-            // sum across rows
-            layer->dbiases->data[j] += relu_gradients->data[i * relu_gradients->dim2 + j];
-            if (layer->dbiases->data[j] > max_gradient) {
-                layer->dbiases->data[j] = max_gradient;
-            }
-        }
-    }
+    calculate_bias_gradients(relu_and_input_grads, layer); // supports parallel
 
     // If clipping gradients, apply
-    if (layer->clipGradients) {
-        clip_gradients(layer->dbiases->data, layer->dbiases->dim1 * layer->dbiases->dim2, -1, 1);
+    if (layer->clip_value > 0) {
+        clip_gradients(layer->dbiases, layer->clip_value); // supports parallel
     }
 
+    // If using l1 and l2 regularization, apply
     if (layer->useRegularization) {
-        // weights
-        for (int i = 0; i < layer->dweights->dim1 * layer->dweights->dim2; i++) {
-            // L2 gradients
-            layer->dweights->data[i] += 2 * layer->lambda_l2 * layer->weights->data[i];
-
-            // L1 gradients (1 if > 0, -1 if < 0)
-            layer->dweights->data[i] += layer->lambda_l1 * (layer->weights->data[i] >= 0.0 ? 1.0 : -1.0);
-        }
-        // biases
-        for (int i = 0; i < layer->dbiases->dim1 * layer->dbiases->dim2; i++) {
-            // L2 gradients
-            layer->dbiases->data[i] += 2 * layer->lambda_l2 * (layer->biases->data[i]);
-
-            // L1 gradients (1 if > 0, -1 if < 0)
-            layer->dbiases->data[i] += layer->lambda_l1 * (layer->biases->data[i] >= 0 ? 1.0: -1.0);
-        }
+        apply_regularization_gradients(layer); // supports parallel
     }
 
     // Calculate gradients for the input
@@ -995,85 +991,72 @@ void backward_reLu(matrix* input_gradients, layer_dense* layer) {
     matrix* weights_transposed = transpose_matrix(layer->weights);
 
     // Check dimensions
-    if (relu_gradients->dim2 != weights_transposed->dim1) {
+    if (relu_and_input_grads->dim2 != weights_transposed->dim1) {
         fprintf(stderr, "Error: Dimensionality mismatch between relu gradients and weights transposed in backwards RELU\n");
         free(weights_transposed->data);
         free(weights_transposed);
-        free(relu_gradients->data);
-        free(relu_gradients);
+        free(relu_and_input_grads->data);
+        free(relu_and_input_grads);
         free(inputs_transposed->data);
         free(inputs_transposed);
         exit(1);
     }
 
     // Dot product of relu_gradients and weights transposed
-    matrix* output_gradients= matrix_mult(relu_gradients, weights_transposed);
+    layer->dinputs = matrix_mult(relu_and_input_grads, weights_transposed); // supports parallel
 
     // If using dropout, apply
     if (layer->drop_out_rate > 0.0) {
-        for (int i = 0; i < output_gradients->dim1 * output_gradients->dim2; i++) {
-            output_gradients->data[i] *= layer->binary_mask->data[i];
-        }
+        apply_dropout_gradients(layer); // supports parallel
     }
 
-    // Copy to dinputs
-    memcpy(layer->dinputs->data, output_gradients->data, layer->dinputs->dim1 * layer->dinputs->dim2 * sizeof(double));
-
     // If clipping gradients, apply
-    if (layer->clipGradients) {
-        clip_gradients(layer->dinputs->data, layer->dinputs->dim1 * layer->dinputs->dim2, -1, 1);
+    if (layer->clip_value > 0) {
+        clip_gradients(layer->dinputs, layer->clip_value); // supports parallel
     }
 
     // Final dimensionality check
     if (layer->weights->dim1 != layer->dweights->dim1 || layer->weights->dim2 != layer->dweights->dim2) {
         fprintf(stderr, "Error. Dimensionality mismatch between dweights and weights in backwards ReLu.\n");
-        free(output_gradients->data);
-        free(output_gradients);
         free(weights_transposed->data);
         free(weights_transposed);
-        free(relu_gradients->data);
-        free(relu_gradients);
+        free(relu_and_input_grads->data);
+        free(relu_and_input_grads);
         free(inputs_transposed->data);
         free(inputs_transposed);
     }
 
     if (layer->biases->dim1 != layer->dbiases->dim1 || layer->biases->dim2 != layer->dbiases->dim2) {
         fprintf(stderr, "Error. Dimensionality mismatch between dbiases and biases in backwards ReLu.\n");
-        free(output_gradients->data);
-        free(output_gradients);
         free(weights_transposed->data);
         free(weights_transposed);
-        free(relu_gradients->data);
-        free(relu_gradients);
+        free(relu_and_input_grads->data);
+        free(relu_and_input_grads);
         free(inputs_transposed->data);
         free(inputs_transposed);
     }
 
     if (layer->inputs->dim1 != layer->dinputs->dim1 || layer->inputs->dim2 != layer->dinputs->dim2) {
         fprintf(stderr, "Error. Dimensionality mismatch between dinputs and inputs in backwards ReLu.\n");
-        free(output_gradients->data);
-        free(output_gradients);
         free(weights_transposed->data);
         free(weights_transposed);
-        free(relu_gradients->data);
-        free(relu_gradients);
+        free(relu_and_input_grads->data);
+        free(relu_and_input_grads);
         free(inputs_transposed->data);
         free(inputs_transposed);
     }
 
     // free unused memory
-    free(output_gradients->data);
-    free(output_gradients);
     free(weights_transposed->data);
     free(weights_transposed);
-    free(relu_gradients->data);
-    free(relu_gradients);
+    free(relu_and_input_grads->data);
+    free(relu_and_input_grads);
     free(inputs_transposed->data);
     free(inputs_transposed);
+
 }
 
 void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
-
     // Check dimensionality
     if (layer->post_activation_output->dim1 != true_labels->dim1 || layer->post_activation_output->dim2 != true_labels->dim2) {
         fprintf(stderr, "Error: Dimensionality mismatch between true labels and predictions in backwards softmax.\n");
@@ -1091,7 +1074,6 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
     // same dimensions as the true_labels
     loss_gradients->dim1 = layer->post_activation_output->dim1;
     loss_gradients->dim2 = layer->post_activation_output->dim2;
-
     loss_gradients->data = (double*) calloc(loss_gradients->dim1 * loss_gradients->dim2, sizeof(double));
 
     // Check memory allocation
@@ -1101,15 +1083,8 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
         exit(1);
     }
 
-    // For each example in the input batch
-    #pragma omp for collapse(2) schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
-    for (int i = 0; i < loss_gradients->dim1; i++){
-        // For each neuron in the input vector
-        for(int j = 0; j < loss_gradients->dim2; j++) {
-            loss_gradients->data[i * loss_gradients->dim2 + j] = layer->post_activation_output->data[i * loss_gradients->dim2 + j] - 
-            true_labels->data[i * loss_gradients->dim2 + j];
-        }
-    }
+    // For each example in the input batch calculate softmax loss gradients
+    calculate_softmax_gradients(loss_gradients, layer, true_labels);
 
     // Calculate layer weight derivatives
     // dot product of inputs for the layer and loss_gradients calculated above.
@@ -1118,7 +1093,7 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
     matrix* inputs_T = transpose_matrix(layer->inputs);
 
     // Check dimensions
-    if(inputs_T->dim2 != loss_gradients->dim1) {
+    if (inputs_T->dim2 != loss_gradients->dim1) {
         fprintf(stderr, "Error: Dimensionality mismatch for inputs transposed in backwards softmax.\n");
         free(loss_gradients->data);
         free(loss_gradients);
@@ -1131,11 +1106,11 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
     */
 
     // Calculate dweights -> dont need to allocate memory as matrix_mult does that.
-    layer->dweights = matrix_mult(inputs_T, loss_gradients);
+    layer->dweights = matrix_mult(inputs_T, loss_gradients); // supports parallel
 
     // If clipping gradients, apply
-    if (layer->clipGradients) {
-        clip_gradients(layer->dweights->data, layer->dweights->dim1 * layer->dweights->dim2, -1, 1);
+    if (layer->clip_value > 0) {
+        clip_gradients(layer->dweights, layer->clip_value); //supports parallel
     }
 
     // Calculate layer bias derivatives
@@ -1150,45 +1125,24 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
     }
 
     // Sum the loss gradients for each example in the batch of inputs
-    #pragma omp for collapse(2) schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
-    for (int j = 0; j < layer->dbiases->dim2; j++) {
-        for(int i = 0; i < layer->post_activation_output->dim1; i++) {
-            // sum across rows
-            layer->dbiases->data[j] += loss_gradients->data[i * loss_gradients->dim2 + j];
-        }
-    }
+    calculate_bias_gradients(loss_gradients, layer); // supports parallel
 
     // If clipping gradients, apply
-    if (layer->clipGradients) {
-        clip_gradients(layer->dbiases->data, layer->dbiases->dim1 * layer->dbiases->dim2, -1, 1);
+    if (layer->clip_value > 0) {
+        clip_gradients(layer->dbiases, layer->clip_value); // supports parallel
     }
 
     // Add regularization derivatives to dweights and dbiases
 
     // Check if using regularization
     if (layer->useRegularization) {
-        // weights
-        for (int i = 0; i < layer->dweights->dim1 * layer->dweights->dim2; i++) {
-            // L2 gradients
-            layer->dweights->data[i] += 2 * layer->lambda_l2 * layer->weights->data[i];
-
-            // L1 gradients (1 if > 0, -1 if < 0)
-            layer->dweights->data[i] += layer->lambda_l1 * (layer->weights->data[i] >= 0.0 ? 1.0 : -1.0);
-        }
-        // biases
-        for (int i = 0; i < layer->dbiases->dim1 * layer->dbiases->dim2; i++) {
-            // L2 gradients
-            layer->dbiases->data[i] += 2 * layer->lambda_l2 * (layer->biases->data[i]);
-
-            // L1 gradients (1 if > 0, -1 if < 0)
-            layer->dbiases->data[i] += layer->lambda_l1 * (layer->biases->data[i] >= 0 ? 1.0: -1.0);
-        }
+        apply_regularization_gradients(layer); // supports parallel
     }
 
     // Backpropogate derivatives for previous layer
 
     // Transpose weights for layer
-    matrix* weights_transposed = transpose_matrix(layer->weights);
+    matrix* weights_transposed = transpose_matrix(layer->weights); 
 
     // Check dimensions
     if(loss_gradients->dim2 != weights_transposed->dim1) {
@@ -1204,41 +1158,22 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
     }
 
     // Calculate backprop derivative to pass to layer previous
-    matrix* output_gradients = matrix_mult(loss_gradients, weights_transposed);
+    layer->dinputs = matrix_mult(loss_gradients, weights_transposed); // supports parallel
 
-    // Ensure dimensions and sizes match
-    if (output_gradients->dim1 != layer->dinputs->dim1 || output_gradients->dim2 != layer->dinputs->dim2) {
-        fprintf(stderr, "Error, dinputs does not match calculated gradient dimensions in backwards softmax.\n");
-        free(loss_gradients->data);
-        free(loss_gradients);
-        free(inputs_T->data);
-        free(layer->dbiases->data);
-        free(layer->dbiases);
-        free(layer->dweights->data);
-        free(layer->dweights);
-        exit(1);    
-    }
 
     // If using dropout, apply
     if (layer->drop_out_rate > 0.0) {
-        for (int i = 0; i < output_gradients->dim1 * output_gradients->dim2; i++) {
-            output_gradients->data[i] *= layer->binary_mask->data[i];
-        }
+        apply_dropout_gradients(layer); // supports parallel
     }
 
-    // Save to layer data structure
-    memcpy(layer->dinputs->data, output_gradients->data, layer->dinputs->dim1 * layer->dinputs->dim2 * sizeof(double));
-    
     // If clipping gradients, apply
-    if (layer->clipGradients) {
-        clip_gradients(layer->dinputs->data, layer->dinputs->dim1 * layer->dinputs->dim2, -1, 1);
+    if (layer->clip_value > 0) {
+        clip_gradients(layer->dinputs, layer->clip_value); // supports parallel
     }
 
     // Final dimensionality check
     if (layer->weights->dim1 != layer->dweights->dim1 || layer->weights->dim2 != layer->dweights->dim2) {
         fprintf(stderr, "Error. Dimensionality mismatch between dweights and weights in backwards ReLu.\n");
-        free(output_gradients->data);
-        free(output_gradients);
         free(weights_transposed->data);
         free(weights_transposed);
         free(loss_gradients->data);
@@ -1247,8 +1182,6 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
 
     if (layer->biases->dim1 != layer->dbiases->dim1 || layer->biases->dim2 != layer->dbiases->dim2) {
         fprintf(stderr, "Error. Dimensionality mismatch between dbiases and biases in backwards ReLu.\n");
-        free(output_gradients->data);
-        free(output_gradients);
         free(weights_transposed->data);
         free(weights_transposed);
         free(loss_gradients->data);
@@ -1257,8 +1190,6 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
 
     if (layer->inputs->dim1 != layer->dinputs->dim1 || layer->inputs->dim2 != layer->dinputs->dim2) {
         fprintf(stderr, "Error. Dimensionality mismatch between dinputs and inputs in backwards ReLu.\n");
-        free(output_gradients->data);
-        free(output_gradients);
         free(weights_transposed->data);
         free(weights_transposed);
         free(loss_gradients->data);
@@ -1266,14 +1197,210 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
     }
 
     // free unused memory
-    free(output_gradients->data);
-    free(output_gradients);
     free(weights_transposed->data);
     free(weights_transposed);
     free(loss_gradients->data);
     free(loss_gradients);
 }
 
+void calculate_relu_gradients(matrix* relu_gradients, layer_dense* layer) {
+
+    // Check if correct dimensions 
+    if (relu_gradients->dim1 != layer->pre_activation_output->dim1 || relu_gradients->dim2 != layer->pre_activation_output->dim2) {
+        fprintf(stderr, "Error, dimension mismatch between relu gradients and pre act outputs in calc_relu_gradients\n");
+        free(relu_gradients->data);
+        free(relu_gradients);
+        free_layer(layer);
+        exit(1);
+    }
+
+
+#ifdef ENABLE_PARALLEL 
+    #pragma omp parallel
+    {
+
+    #pragma omp for 
+    for (int i = 0; i < layer->pre_activation_output->dim1 * layer->pre_activation_output->dim2; i++) {
+        if (layer->pre_activation_output->data[i] >= 0) {
+            relu_gradients->data[i] = 1;
+        }
+        else {
+            relu_gradients->data[i] = 0;
+        }
+    }
+
+    }
+ 
+#else
+    // Iterate through every value in layer post activation output to get relu gradients
+    for (int i = 0; i < layer->pre_activation_output->dim1 * layer->pre_activation_output->dim2; i++) {
+        if (layer->pre_activation_output->data[i] >= 0) {
+            relu_gradients->data[i] = 1;
+        }
+        else {
+            relu_gradients->data[i] = 0;
+        }
+    }
+
+#endif
+
+}
+
+void calculate_softmax_gradients(matrix* softmax_gradients, layer_dense* layer, matrix* true_labels) {
+    // Check if correct dimensions 
+    if (softmax_gradients->dim1 != layer->post_activation_output->dim1 || softmax_gradients->dim2 != layer->post_activation_output->dim2) {
+        fprintf(stderr, "Error, dimension mismatch between softmax gradients and post act outputs in calc_softmax_gradients\n");
+        exit(1);
+    }
+
+    if (softmax_gradients->dim1 != true_labels->dim1 || softmax_gradients->dim2 != true_labels->dim2) {
+        fprintf(stderr, "Error, dimension mismatch between softmax gradients and true_labels in calc_softmax_gradients\n");
+        exit(1);
+    } 
+
+#ifdef ENABLE_PARALLEL
+    int row_gradients = softmax_gradients->dim1;
+    int col_gradients = softmax_gradients->dim2;
+
+#pragma omp parallel
+{
+    int thread_id = omp_get_thread_num(); // Get current thread id
+    int total_threads = omp_get_num_threads(); // Get total num threads
+    int rows_per_thread = (row_gradients + total_threads - 1) / total_threads; // Get num rows to calc per each thread
+    int start_row = rows_per_thread * thread_id; // Get start row for unique thread
+    int end_row = rows_per_thread * thread_id + rows_per_thread; // Get end row for unique thread
+
+    // Check to see if in bounds of thread calculations
+    if (end_row > row_gradients) {
+        end_row = row_gradients;
+    }
+
+    for (int i = start_row; i < end_row; i++){
+        // For each neuron in the input vector
+        for(int j = 0; j < col_gradients; j++) {
+            softmax_gradients->data[i * col_gradients + j] = layer->post_activation_output->data[i * col_gradients + j] - 
+                                true_labels->data[i * col_gradients + j];
+        }
+    }   
+}
+
+#else
+    for (int i = 0; i < softmax_gradients->dim1; i++){
+        // For each neuron in the input vector
+        for(int j = 0; j < softmax_gradients->dim2; j++) {
+            softmax_gradients->data[i * softmax_gradients->dim2 + j] = layer->post_activation_output->data[i * softmax_gradients->dim2 + j] - 
+                                true_labels->data[i * softmax_gradients->dim2 + j];
+        }
+    }   
+
+#endif
+
+
+}
+
+void calculate_bias_gradients(matrix* input_gradients, layer_dense* layer) {
+
+    // Check dimensions
+    if (layer->dbiases->dim2 != input_gradients->dim2) {
+        fprintf(stderr, "Dimensionality mismatch in calculate bias gradients.\n");
+        exit(1);
+    }
+
+#ifdef ENABLE_PARALLEL
+    int num_biases = layer->dbiases->dim2;
+    int row_gradients = input_gradients->dim1;
+    int col_gradients = input_gradients->dim2;
+
+#pragma omp parallel 
+{
+    int thread_id = omp_get_thread_num(); // Get current thread id
+    int total_threads = omp_get_num_threads(); // Get total num threads
+    int rows_per_thread = (num_biases + total_threads - 1) / total_threads; // Get num rows to calc per each thread
+    int start_row = rows_per_thread * thread_id; // Get start row for unique thread
+    int end_row = rows_per_thread * thread_id + rows_per_thread; // Get end row for unique thread
+
+    if (end_row > num_biases) {
+        end_row = num_biases;
+    }
+
+    // Calculate bias gradients
+    for (int j = start_row; j < end_row; j++) {
+        for(int i = 0; i < row_gradients; i++) {
+            // sum across rows
+            layer->dbiases->data[j] += input_gradients->data[i * col_gradients + j];
+        }
+    }
+}
+#else
+
+    // Calculate bias gradients
+    for (int j = 0; j < layer->dbiases->dim2; j++) {
+        for(int i = 0; i < input_gradients->dim1; i++) {
+            // sum across rows
+            layer->dbiases->data[j] += input_gradients->data[i * input_gradients->dim2 + j];
+        }
+    }
+
+#endif
+}
+
+void apply_regularization_gradients(layer_dense* layer) {  
+#ifdef ENABLE_PARALLEL
+
+    // weights
+    #pragma omp for
+    for (int i = 0; i < layer->dweights->dim1 * layer->dweights->dim2; i++) {
+        // L2 gradients
+        layer->dweights->data[i] += 2 * layer->lambda_l2 * layer->weights->data[i];
+
+        // L1 gradients (1 if > 0, -1 if < 0)
+        layer->dweights->data[i] += layer->lambda_l1 * (layer->weights->data[i] >= 0.0 ? 1.0 : -1.0);
+    }
+    // biases
+    #pragma omp for
+    for (int i = 0; i < layer->dbiases->dim1 * layer->dbiases->dim2; i++) {
+        // L2 gradients
+        layer->dbiases->data[i] += 2 * layer->lambda_l2 * (layer->biases->data[i]);
+
+        // L1 gradients (1 if > 0, -1 if < 0)
+        layer->dbiases->data[i] += layer->lambda_l1 * (layer->biases->data[i] >= 0 ? 1.0: -1.0);
+    }
+
+#else
+    // weights
+    for (int i = 0; i < layer->dweights->dim1 * layer->dweights->dim2; i++) {
+        // L2 gradients
+        layer->dweights->data[i] += 2 * layer->lambda_l2 * layer->weights->data[i];
+
+        // L1 gradients (1 if > 0, -1 if < 0)
+        layer->dweights->data[i] += layer->lambda_l1 * (layer->weights->data[i] >= 0.0 ? 1.0 : -1.0);
+    }
+    // biases
+    for (int i = 0; i < layer->dbiases->dim1 * layer->dbiases->dim2; i++) {
+        // L2 gradients
+        layer->dbiases->data[i] += 2 * layer->lambda_l2 * (layer->biases->data[i]);
+
+        // L1 gradients (1 if > 0, -1 if < 0)
+        layer->dbiases->data[i] += layer->lambda_l1 * (layer->biases->data[i] >= 0 ? 1.0: -1.0);
+    }
+
+#endif
+}
+
+void apply_dropout_gradients(layer_dense* layer) {
+#ifdef ENABLE_PARALLEL
+
+    #pragma omp for schedule(static)
+    for (int i = 0; i < layer->dinputs->dim1 * layer->dinputs->dim2; i++) {
+        layer->dinputs->data[i] *= layer->binary_mask->data[i];
+    }
+
+#else
+    for (int i = 0; i < layer->dinputs->dim1 * layer->dinputs->dim2; i++) {
+        layer->dinputs->data[i] *= layer->binary_mask->data[i];
+    }
+#endif
+}
 
 ////////////////////////////////////////////////// OPTIMIZER METHODS ///////////////////////////////////////////////////////////////////////////
 
@@ -1285,7 +1412,7 @@ void update_params_sgd(layer_dense* layer, double* learning_rate, int current_ep
     *learning_rate = fmax(*learning_rate * exp(-decay_rate * current_epoch), 0.000001);
 
     // Update weights
-    #pragma omp for collapse(2) schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
+    // #pragma omp for collapse(2) schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
     for (int i = 0; i < layer->num_neurons; i++) {
         for (int j = 0; j < layer->num_inputs; j++) {
             // W = W - learning_rate * dL/dW
@@ -1306,10 +1433,10 @@ void update_params_sgd_momentum(layer_dense* layer, double* learning_rate, int c
     // Decay the learning rate after each epoch
     // *learning_rate = *learning_rate / (1 + decay_rate * current_epoch);
     // fmax ensures min learning rate of 0.000001
-    *learning_rate = fmax(*learning_rate * exp(-decay_rate * current_epoch), 0.000001);
+    *learning_rate = fmax(*learning_rate * exp(-decay_rate * current_epoch), 0.001);
     
     // Update weights
-    #pragma omp for collapse(2) schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
+    // #pragma omp for collapse(2) schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
     for (int i = 0; i < layer->num_neurons; i++) {
         for (int j = 0; j < layer->num_inputs; j++) {
             // v_t = beta * v_(t-1) + (1 - beta) * dL/dW
@@ -1322,7 +1449,7 @@ void update_params_sgd_momentum(layer_dense* layer, double* learning_rate, int c
     }
 
     // Update biases
-    #pragma omp for schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
+    // #pragma omp for schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
     for(int i = 0; i < layer->num_neurons; i++) {
         // v_t = beta * v_(t-1) + (1 - beta) * dL/dB
         layer->b_velocity->data[i] = beta * layer->b_velocity->data[i] + (1 - beta) * layer->dbiases->data[i];
@@ -1335,7 +1462,7 @@ void update_params_adagrad(layer_dense* layer, double* learning_rate, double dec
     // WEIGHTS
 
     // Square every element in dweights, add to cache_weights
-    #pragma omp for schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
+    // #pragma omp for schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
     for (int i = 0; i < layer->cache_weights->dim1 * layer->cache_weights->dim2; i++) {
         // Calculate cache
         layer->cache_weights->data[i] += layer->dweights->data[i] * layer->dweights->data[i];
@@ -1347,7 +1474,7 @@ void update_params_adagrad(layer_dense* layer, double* learning_rate, double dec
     // BIASES
 
     // Square every element in dbiases, add to cache_biases
-    #pragma omp for schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
+    // #pragma omp for schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
     for (int i = 0; i < layer->cache_bias->dim1 * layer->cache_bias->dim2; i++) {
         // Calculate cache
         layer->cache_bias->data[i] += layer->dbiases->data[i] * layer->dbiases->data[i];
@@ -1358,7 +1485,7 @@ void update_params_adagrad(layer_dense* layer, double* learning_rate, double dec
 
 void update_params_rmsprop(layer_dense* layer, double* learning_rate, double decay_rate, double epsilon) {
     // WEIGHTS
-    #pragma omp for schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
+    // #pragma omp for schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
     for (int i = 0; i < layer->weights->dim1 * layer->weights->dim2; i++) {
         // Update cache for weights
         layer->cache_weights->data[i] = decay_rate * layer->cache_weights->data[i] +
@@ -1416,64 +1543,82 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
     }
 
     // Apply learning rate decay (if decay factor is specified)
-    if (decay_rate > 1e-10) {
-        *learning_rate = *learning_rate / (1.0 + decay_rate * t);
+    if (decay_rate > 0.0) {
+        *learning_rate = *learning_rate / (1 + decay_rate * t / 10);
     }
+    float min_learning_rate = 1e-6;
+    *learning_rate = fmax(*learning_rate, min_learning_rate);
 
     // Weights
-    #pragma omp parallel num_threads(8) 
-    {
-        #pragma omp for schedule(dynamic)
-        for (int i = 0; i < layer->dweights->dim1 * layer->dweights->dim2; i++) {
-            // Update Momentum
-            layer->w_velocity->data[i] = beta_1 * layer->w_velocity->data[i] + (1.0 - beta_1) * layer->dweights->data[i];
-            
-            // Correct Momentum
-            if (correctBias) {
-                layer->w_velocity->data[i] = layer->w_velocity->data[i] / (1.0 - pow(beta_1, t + 1)); // Bias correction for weights momentum
-            }
-
-            // Update cache 
-            layer->cache_weights->data[i] = beta_2 * layer->cache_weights->data[i] + (1.0 - beta_2) * layer->dweights->data[i] * layer->dweights->data[i];
-            
-            // Correct cache
-            if (correctBias) {
-                layer->cache_weights->data[i] = layer->cache_weights->data[i] / (1.0 - pow(beta_2, t + 1)); // Bias correction for weight cache
-            }
-
-            // Update Weights using corrected moments and cache
-            layer->weights->data[i] -= (*learning_rate) * layer->w_velocity->data[i] / (sqrt(layer->cache_weights->data[i]) + epsilon);
-
+    for (int i = 0; i < layer->dweights->dim1 * layer->dweights->dim2; i++) {
+    // Update Momentum
+        layer->w_velocity->data[i] = beta_1 * layer->w_velocity->data[i] + (1.0 - beta_1) * layer->dweights->data[i];
+        
+        // Correct Momentum
+        if (correctBias) {
+            double log_beta_1 = log(beta_1);
+            layer->w_velocity->data[i] = layer->w_velocity->data[i] / (1.0 - exp((t + 1) * log_beta_1)); // Bias correction for weights momentum
         }
+
+        // Update cache 
+        layer->cache_weights->data[i] = beta_2 * layer->cache_weights->data[i] + (1.0 - beta_2) * layer->dweights->data[i] * layer->dweights->data[i];
+        
+        // Correct cache
+        if (correctBias) {
+            double log_beta_2 = log(beta_2);
+            layer->cache_weights->data[i] = layer->cache_weights->data[i] / (1.0 - exp((t + 1) * log_beta_2)); // Bias correction for weight cache
+        }
+
+        // Update Weights using corrected moments and cache
+        layer->weights->data[i] -= (*learning_rate) * layer->w_velocity->data[i] / (sqrt(layer->cache_weights->data[i]) + epsilon);
     }
+    
 
     // Biases
-    #pragma omp parallel num_threads(8) 
-    {   
-        #pragma omp for schedule(dynamic)
-        for (int i = 0; i < layer->dbiases->dim1 * layer->dbiases->dim2; i++) {
+    for (int i = 0; i < layer->dbiases->dim1 * layer->dbiases->dim2; i++) {
+        // Update Momentum
+        layer->b_velocity->data[i] = beta_1 * layer->b_velocity->data[i] + (1.0 - beta_1) * layer->dbiases->data[i];
+        
+        // Correct Momentum
+        if (correctBias) {
+            layer->b_velocity->data[i] = layer->b_velocity->data[i] / (1.0 - pow(beta_1, t + 1)); // Bias correction for bias momentum
+        }
+        
+        // Update cache 
+        layer->cache_bias->data[i] = beta_2 * layer->cache_bias->data[i] + (1.0 - beta_2) * layer->dbiases->data[i] * layer->dbiases->data[i];
+        
+        // Correct cache
+        if (correctBias) {
+            layer->cache_bias->data[i] = layer->cache_bias->data[i] / (1.0 - pow(beta_2, t + 1)); // Bias correction for bias cache
+        }
 
-                // Update Momentum
-                layer->b_velocity->data[i] = beta_1 * layer->b_velocity->data[i] + (1.0 - beta_1) * layer->dbiases->data[i];
-                
-                // Correct Momentum
-                if (correctBias) {
-                    layer->b_velocity->data[i] = layer->b_velocity->data[i] / (1.0 - pow(beta_1, t + 1)); // Bias correction for bias momentum
-                }
-                
-                // Update cache 
-                layer->cache_bias->data[i] = beta_2 * layer->cache_bias->data[i] + (1.0 - beta_2) * layer->dbiases->data[i] * layer->dbiases->data[i];
-                
-                // Correct cache
-                if (correctBias) {
-                    layer->cache_bias->data[i] = layer->cache_bias->data[i] / (1.0 - pow(beta_2, t + 1)); // Bias correction for bias cache
-                }
-
-                // Update Bias using corrected moments and cache
-                layer->biases->data[i] -= (*learning_rate) * layer->b_velocity->data[i] / (sqrt(layer->cache_bias->data[i]) + epsilon);
-
-            }
+        // Update Bias using corrected moments and cache
+        layer->biases->data[i] -= (*learning_rate) * layer->b_velocity->data[i] / (sqrt(layer->cache_bias->data[i]) + epsilon);
     }
 }
 
+void optimization_dense(layer_dense* layer, double* lr, double lr_decay, int current_epoch, double beta1, double beta2,
+                        double epsilon, bool useBiasCorrection) {
+    if (layer->optimization == SGD){
+        update_params_sgd(layer, lr, current_epoch, lr_decay);
+    }
+    else if (layer->optimization == SGD_MOMENTUM) {
+        update_params_sgd_momentum(layer, lr, current_epoch, lr_decay, beta1);
+    }
 
+    else if(layer->optimization == ADA_GRAD) {
+        update_params_adagrad(layer, lr, lr_decay, epsilon);
+    }
+
+    else if(layer->optimization == RMS_PROP) {
+        update_params_rmsprop(layer, lr, lr_decay, epsilon);
+    }
+
+    else if (layer->optimization == ADAM) {
+        update_params_adam(layer, lr, lr_decay, beta1, beta2, epsilon, current_epoch, useBiasCorrection);
+    }
+
+    // Free memory after optimization
+
+
+}

@@ -741,7 +741,7 @@ void test_init_neural_network() {
     OptimizationType optimizations[NUM_LAYERS] = {SGD_MOMENTUM, SGD_MOMENTUM, SGD_MOMENTUM};
     bool regularizations[NUM_LAYERS] = {true, true, true};
     // Initialize layer based off defined constants
-    NeuralNetwork* test_network = init_neural_network(NUM_LAYERS, NUM_EPOCHS, num_neurons_in_layers, 
+    NeuralNetwork* test_network = init_neural_network(NUM_LAYERS, num_neurons_in_layers, 
                                                 LEARNING_RATE, activations, optimizations, regularizations, NUM_BATCH_FEATURES);
 
     // Check to see if layer was allocated properly
@@ -809,7 +809,7 @@ void test_forward_pass_nn() {
     bool regularizations[NUM_LAYERS] = {true, true, true};
 
     // Initialize layer based off defined constants
-    NeuralNetwork* network = init_neural_network(NUM_LAYERS, NUM_EPOCHS, num_neurons_in_layers, 
+    NeuralNetwork* network = init_neural_network(NUM_LAYERS, num_neurons_in_layers, 
                                                 LEARNING_RATE, activations, optimizations,regularizations, NUM_BATCH_FEATURES);
 
     // Check to see if layer was allocated properly
@@ -885,7 +885,7 @@ void test_backward_pass_nn() {
     bool regularizations[NUM_LAYERS] = {true, true, true};
 
     // Initialize layer based off defined constants
-    NeuralNetwork* network = init_neural_network(NUM_LAYERS, NUM_EPOCHS, num_neurons_in_layers, 
+    NeuralNetwork* network = init_neural_network(NUM_LAYERS, num_neurons_in_layers, 
                                                 LEARNING_RATE, activations, optimizations, regularizations, NUM_BATCH_FEATURES);
 
     // Check to see if layer was allocated properly
@@ -960,7 +960,7 @@ void test_train_nn(){
     bool regularizations[NUM_LAYERS] = {true, true, true};
 
     // Initialize layer based off defined constants
-    NeuralNetwork* network = init_neural_network(NUM_LAYERS, NUM_EPOCHS, num_neurons_in_layers, 
+    NeuralNetwork* network = init_neural_network(NUM_LAYERS, num_neurons_in_layers, 
                                                 LEARNING_RATE, activations, optimizations, regularizations, NUM_BATCH_FEATURES);
 
     // Check to see if layer was allocated properly

@@ -3,7 +3,7 @@ Asu Ghimire
 11/17/2024
 
 Utility "Class".
-Provides basic utilites for forward.c, backward.c, network.c
+Provides basic utilites 
 Handles 
     > Linear algebra functionalities
     > Data loading 
@@ -19,6 +19,7 @@ Handles
 #include <time.h>
 #include <float.h> 
 #include <stdbool.h>
+
 
 //////////////////////////////////////////////////// Data Structures //////////////////////////////////////////////////////////////
 /*
@@ -115,9 +116,29 @@ void print_matrix(matrix* M);
 
 /*
 Returns a matrix object. Allocates memory on the heap for the object.
-Takes the matrix product of w x v. Order matters.
+Returns the matrix product of w x v. Order matters.
 Includes dimensionality checks.
 */
 matrix* matrix_mult(matrix* w, matrix* v);
+
+
+/*
+Returns a matrix object. Allocates memory on the heap for the object.
+Returns element by element matrix product of w x v. Order doesnt matter.
+Includes dimensionality checks.
+*/
+matrix* element_matrix_mult(matrix* w, matrix* v);
+
+/*
+Returns a scalar for the dot product of w and v
+Includes dimensionality checks.
+*/
+double vector_dot_product(matrix* w, matrix* v);
+
+/*
+Returns a matrix scaled by s.
+*/
+void matrix_scalar_mult(matrix* w, double s);
+
 
 #endif

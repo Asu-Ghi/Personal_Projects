@@ -7,9 +7,8 @@ Interface for working with Self Made C-Library for Neural Networks.
 """
 
 import numpy as np
-import ctypes
 
-# Andrej Karpathy create data code.
+# Andrej Karpathy create data code
 def create_data(samples, classes):
     X = np.zeros((samples*classes, 2))
     y = np.zeros(samples*classes, dtype='uint8')
@@ -28,7 +27,7 @@ def create_data(samples, classes):
 
     return X, y
 
-
+# Create one hot labels from spiral data
 def create_one_hot(y, num_classes):
     """
     Convert class labels to one-hot encoded vectors.
@@ -38,6 +37,7 @@ def create_one_hot(y, num_classes):
     """
     return np.eye(num_classes)[y]
 
+# Save data to csv 
 def save_data_csv(X, y, x_filename="features.csv", y_filename="labels.csv"):
     """
     Save the feature matrix X and label array y to separate CSV files.
@@ -55,16 +55,16 @@ def save_data_csv(X, y, x_filename="features.csv", y_filename="labels.csv"):
     np.savetxt(y_filename, y, delimiter=',')
     print(f"Labels saved to {y_filename}")
 
-
+# main
 def main():
-    num_samples = 100
+    num_samples = 1000
     num_classes = 3
 
     # Generate data
     X, y = create_data(num_samples, num_classes)
     y = create_one_hot(y, num_classes)
 
-    save_data_csv(X, y, "../DataSets/Spiral/test_data.csv", "../DataSets/Spiral/test_labels.csv")
+    save_data_csv(X, y, "../DataSets/Spiral/test_data_1000.csv", "../DataSets/Spiral/test_labels_1000.csv")
 
 if __name__ == "__main__":
     main()

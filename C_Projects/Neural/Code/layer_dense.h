@@ -41,10 +41,8 @@ typedef struct {
     bool useRegularization; // Determines if using L1 and L2 regularization
     double lambda_l1;  // L1 regularization coefficient
     double lambda_l2;  // L2 regularization coefficient} 
+    double clip_value;
 
-    bool clipGradients; // Determines if clipping gradients
-    double lowerClip; // Lower clip bound
-    double upperClip; // Upper clip bound
 }layer_dense;
 
 //////////////////////////////////////////////////// LAYER METHODS ///////////////////////////////////////////////////////////////////////////
@@ -54,7 +52,7 @@ typedef struct {
 /*
 Clips gradients to a min and max value, useful if experiencing exploding gradients. Applied in backwards.
 */
-void clip_gradients(double* gradients, int size, double min_value, double max_value);
+void clip_gradients(matrix* gradients, double clip_value);
 
 
 /*
@@ -138,6 +136,37 @@ Backward pass for layers with ReLu
 */
 void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer);
 
+/*
+Calculate relu gradients -> used in backward_relu
+Has flags for parallelization using omp
+*/
+void calculate_relu_gradients(matrix* relu_gradients, layer_dense* layer);
+
+/*
+Calculate softmax gradients -> used in backward_softmax_loss
+Has flags for parallelization using omp
+*/
+void calculate_softmax_gradients(matrix* softmax_gradients, layer_dense* layer, matrix* true_labels);
+
+/*
+Calculate bias gradients -> used in backward_relu and backward_softmax
+Has flags for parallelization using omp
+*/
+void calculate_bias_gradients(matrix* input_gradients, layer_dense* layer);
+
+/*
+Applies l1 and l2 regularization to gradients -> used in backward_relu and backward_softmax
+Has flags for parallelization using omp
+*/
+void apply_regularization_gradients(layer_dense* layer);
+
+/*
+Calculates gradients for binary mask drop applied to outputs-> used in backward_relu and backward_softmax
+Has flags for parallelization using omp
+*/
+void apply_dropout_gradients(layer_dense* layer);
+
+
 ////////////////////////////////////////////////// OPTIMIZER METHODS ///////////////////////////////////////////////////////////////////////////
 
 /*
@@ -171,4 +200,9 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
                     double beta_1, double beta_2, double epsilon, int t, bool correctBias);
 
 
-// Misc 
+
+/*
+Call optimization for dense
+*/
+void optimization_dense(layer_dense* layer, double* lr, double lr_decay, int current_epoch, double beta1, double beta2,
+                        double epsilon, bool useBiasCorrection);

@@ -264,6 +264,7 @@ void print_matrix(matrix* M) {
     }
 }
 
+// Includes ifdef for parallelization
 matrix* matrix_mult(matrix* w, matrix* v) {
 
     // Get dimensionality info
@@ -289,24 +290,187 @@ matrix* matrix_mult(matrix* w, matrix* v) {
         exit(1);
     }
 
+#ifdef ENABLE_PARALLEL 
+    // double start_time = omp_get_wtime();
     // Perform the matrix multiplication
-    #pragma omp parallel num_threads(8)
-    {
-        #pragma omp for collapse(2) schedule(dynamic) // Parallelize 
-        for (int i = 0; i < rows_w; i++) { // For each row in the result
-            for (int j = 0; j < cols_v; j++) { // For each column in the result
-                for (int k = 0; k < cols_w; k++) { // Shared dimension
+    #pragma omp parallel 
+    {   
+        int thread_id = omp_get_thread_num(); // Get current thread id
+        int total_threads = omp_get_num_threads(); // Get total num threads
+        int rows_per_thread = (rows_w + total_threads - 1) / total_threads; // Get num rows to calc per each thread
+        int start_row = rows_per_thread * thread_id; // Get start row for unique thread
+        int end_row = rows_per_thread * thread_id + rows_per_thread; // Get end row for unique thread
+
+        // Check to see if in bounds of thread calculations
+        if (end_row > rows_w) {
+            end_row = rows_w;
+        }
+
+        // Calculate matrix mult for each row
+        for (int i = start_row; i < end_row; i++) {
+            for (int j = 0; j < cols_v; j++) {
+                for (int k = 0; k < cols_w; k++) {
                     result->data[i * cols_v + j] += w->data[i * cols_w + k] * v->data[k * cols_v + j];
                 }
             }
         }
     }
+    // double end_time = omp_get_wtime();
+    // printf("Matrix multiplication completed in %.6f seconds.\n", end_time - start_time);
 
+
+#else 
+        for (int i = 0; i < rows_w; i++) {
+            for (int j = 0; j < cols_v; j++) {
+                for (int k = 0; k < cols_w; k++) {
+                    result->data[i * cols_v + j] += w->data[i * cols_w + k] * v->data[k * cols_v + j];
+                }
+            }
+        }
+
+
+#endif
+
+    return result;
+
+}
+
+// Includes ifdef for parallelization
+matrix* element_matrix_mult(matrix* w, matrix* v){
+    // Check dimensions
+    if(w->dim1 != v->dim1 || w->dim2 != v->dim2) {
+        fprintf(stderr, "Error, mismatching dimensions in element matrix mult.\n");
+    }
+    int row_w = w->dim1;
+    int col_w = w->dim2;
+
+    // Allocate and check memory for result
+    matrix* result = malloc(sizeof(matrix));
+    result->dim1 = row_w;
+    result->dim2 = col_w;
+    result->data = (double*) calloc(row_w * col_w, sizeof(double));
+
+    if (result->data == NULL) {
+        fprintf(stderr, "Memory allocation failure for result in element matrix mult.\n");
+        exit(1);
+    }
+
+
+
+#ifdef ENABLE_PARALLEL 
+    // Parallel Code
+    #pragma omp parallel 
+    {
+        int thread_id = omp_get_thread_num(); // Get current thread id
+        int total_threads = omp_get_num_threads(); // Get total num threads
+        int rows_per_thread = (row_w + total_threads - 1) / total_threads; // Get num rows to calc per each thread
+        int start_row = rows_per_thread * thread_id; // Get start row for unique thread
+        int end_row = rows_per_thread * thread_id + rows_per_thread; // Get end row for unique thread
+
+        if (end_row > row_w) {
+            end_row = row_w;
+        }
+
+        for (int i = start_row; i < end_row; i++) {
+            for (int j = 0; j < col_w; j++) {
+                result->data[i * col_w + j] = w->data[i * col_w + j] * v->data[i * col_w + j];
+            }
+        }
+    }
+
+#else
+
+    // Sequential Code
+    for (int i = 0; i < row_w; i++) {
+        for (int j = 0; j < col_w; j++) {
+            result->data[i * col_w + j] = w->data[i * col_w + j] * v->data[i * col_w + j];
+        }
+    }
+
+#endif
     return result;
 }
 
+// Includes ifdef for parallelization
+double vector_dot_product(matrix* w, matrix* v) {
 
+    // Check dimensions
+    if (w->dim1 != v->dim1 || w->dim2 != v->dim2) {
+        fprintf(stderr, "Error, Dimensionality mismatch in vector dot product.\n");
+        exit(1);
+    }
 
+    double sum = 0.0;
+    int dim = w->dim1 * w->dim2;
+
+#ifdef ENABLE_PARALLEL
+    #pragma omp parallel
+    {
+        int thread_id = omp_get_thread_num(); // Get current thread id
+        int total_threads = omp_get_num_threads(); // Get total num threads
+        int rows_per_thread = (dim + total_threads - 1) / total_threads; // Get num rows to calc per each thread
+        int start_row = rows_per_thread * thread_id; // Get start row for unique thread
+        int end_row = rows_per_thread * thread_id + rows_per_thread; // Get end row for unique thread
+        double thread_sum = 0.0;
+
+        // check bounds
+        if (end_row > dim) {
+            end_row = dim;
+        }
+        for (int i = start_row; i < end_row; i++) {
+            thread_sum += w->data[i] * v->data[i];
+        }
+
+        // update sum
+        #pragma omp atomic
+        sum += thread_sum;
+    }
+
+#else
+    for (int i = 0; i < dim; i++) {
+        sum += w->data[i] * v->data[i];
+    }
+
+#endif
+    return sum;
+}
+
+// Includes ifdef for parallelization
+void matrix_scalar_mult(matrix* w, double s) {
+
+    int rows = w->dim1;
+    int cols = w->dim2;
+    
+#ifdef ENABLE_PARALLEL
+#pragma omp parallel
+{
+    int thread_id = omp_get_thread_num(); // Get current thread id
+    int total_threads = omp_get_num_threads(); // Get total num threads
+    int rows_per_thread = (rows + total_threads - 1) / total_threads; // Get num rows to calc per each thread
+    int start_row = rows_per_thread * thread_id; // Get start row for unique thread
+    int end_row = rows_per_thread * thread_id + rows_per_thread; // Get end row for unique thread
+    
+    // check bounds
+    if(end_row > rows) {
+        end_row = rows;
+    }
+
+    for (int i = start_row; i < end_row; i++) {
+        for (int j = 0; j < cols; j++) {
+            w->data[i * cols + j] = s * w->data[i * cols + j];
+        }
+    }
+
+}
+
+#else
+    for (int i = 0; i < rows * cols; i++) {
+        w->data[i] = s * w->data[i];
+    }
+
+#endif
+
+}
 
 
 
