@@ -1,13 +1,26 @@
-# Personal_Projects
-A repository containing the projects of Asutosh Ghimire.
+---
+title: "Personal Projects"
+author: "Asutosh Ghimire"
+date: "2024-09"
+output: html_document
+---
 
-Includes data structure designs, exploratory mockups, and personal projects written in both C and Python.
+# Personal Projects  
+A comprehensive repository showcasing the personal projects of **Asutosh Ghimire**.  
 
-// 
-Currently Working on an Implementation of a Neural Network Framework in C.
-Contained in the Neural Subdirectory of C_Projects.
-Written to be implemented later with parallel programing in CUDA.
-//
 
-Created 09/2024
+## Projects  
 
+### MiniNet
+
+This subdirectory currently includes a fully ground up implementation of a Neural Network in C.
+
+Contains implementations of core data structures, algorithms, and systems programming tasks. Emphasis on performance and modularity for reuse in larger applications. 
+
+---
+
+## Current Work  
+### Neural Network Framework Implementation (C)  
+Currently building a custom neural network framework under the `MiniNet` subdirectory.  
+- Designed with future integration of **parallel programming** paradigms, including **CUDA** and **OpenMP**, for high-performance C
+- Interfaces with a shared ctype python library for ease of use and visualization.
