@@ -51,8 +51,10 @@ executable:
 .PHONY: all
 all: $(OUTPUT_FILE)
 
+
 # Rule to build the shared library or executable
 $(OUTPUT_FILE): $(SRC_FILES)
+	@echo "Compiling to: $(OUTPUT_FILE)"  
 	$(CC) $(CFLAGS) $(PARALLEL_FLAG) $(DEBUG_FLAG) $(SHARED_FLAG) -I$(INCLUDE_DIR) -o $(OUTPUT_FILE) $(SRC_FILES)
 
 # Clean up compiled objects

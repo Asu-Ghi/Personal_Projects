@@ -1,6 +1,6 @@
 ---
 title: "MiniNet"
-author: "Asutosh Ghimire"
+author: "Asu Ghimire"
 date: "2024-11"
 output: html_document
 ---
@@ -13,4 +13,4 @@ output: html_document
 
 ## Planned Work
 - Support for CNN and RNN layers
-- CUDA implementation for computationally heavier tasks
+- CUDA implementation for computationally heavier training tasks

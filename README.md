@@ -1,6 +1,6 @@
 ---
 title: "Personal Projects"
-author: "Asutosh Ghimire"
+author: "Asu Ghimire"
 date: "2024-09"
 output: html_document
 ---

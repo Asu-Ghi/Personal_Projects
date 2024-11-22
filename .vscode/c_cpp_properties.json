@@ -3,21 +3,22 @@
         {
             "name": "Mac",
             "includePath": [
-                "${workspaceFolder}/**",
-                "/opt/homebrew/opt/libomp/include"  // OpenMP header path
+                "${workspaceFolder}/MiniNet/include",
+                "${workspaceFolder}/MiniNet/tests/include",
+                "/opt/homebrew/opt/libomp/include"
             ],
             "defines": [],
             "macFrameworkPath": [
                 "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
             ],
-            "compilerPath": "/opt/homebrew/bin/gcc",  // Use Homebrew GCC
+            "compilerPath": "/opt/homebrew/bin/gcc",
             "cStandard": "c17",
             "cppStandard": "c++17",
-            "intelliSenseMode": "macos-gcc-x64",  // Change to GCC mode for IntelliSense
+            "intelliSenseMode": "macos-gcc-x64",
             "browse": {
                 "path": [
                     "${workspaceFolder}/**",
-                    "/opt/homebrew/opt/libomp/include"  // OpenMP browse path for IntelliSense
+                    "/opt/homebrew/opt/libomp/include"
                 ],
                 "limitSymbolsToIncludedHeaders": true
             }
