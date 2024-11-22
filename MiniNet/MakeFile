@@ -1,77 +1,62 @@
-#!/bin/bash
-
-# Set stack size limit
-ulimit -s 16384  # For example, 16 MB stack size
-
-# Set OpenMP environment variables
-export OMP_DEBUG=true
-export OMP_NUM_THREADS=6
-export OMP_DISPLAY_ENV=true
-export OMP_SCHEDULE=DYNAMIC
-export OMP_PROC_BIND=TRUE
-
 # Project directories
-SRC_DIR="src"
-BUILD_DIR="build"
-PYTHON_DIR="python"
-INCLUDE_DIR="include"
+SRC_DIR = src
+BUILD_DIR = build
+INCLUDE_DIR = include
+PYTHON_DIR = python
 
-# Default Flags
-PARALLEL_FLAG=""
-DEBUG_FLAG=""
-SHARED_FLAG=""
-OUTPUT_FILE=""
+# Compiler and flags
+CC = gcc-14
+CFLAGS = -O3 -march=native -funroll-loops -ftree-vectorize -fopenmp
+LDFLAGS = 
+PARALLEL_FLAG = 
+DEBUG_FLAG = 
+SHARED_FLAG = 
+OUTPUT_FILE = 
 
-# Check for the command-line argument for parallel flag
-if [[ "$1" == "-parallel" ]]; then
-    PARALLEL_FLAG="-DENABLE_PARALLEL"
-    echo "Compiling with parallelization enabled..."
-else
-    echo "Compiling without parallelization..."
-fi
+# Target to compile shared library
+SHARED_LIB = $(BUILD_DIR)/libnn.so
 
-# Check for debugging flag 
-if [[ "$2" == "-diag" ]]; then
-    DEBUG_FLAG="lldb"
-    echo "Debugging with lldb enabled..."
-fi
+# Target to compile executable
+EXEC_FILE = $(BUILD_DIR)/main
 
-# Check for the shared library flag
-if [[ "$3" == "-shared" ]]; then
-    SHARED_FLAG="-shared -fPIC"
-    OUTPUT_FILE="${BUILD_DIR}/libnn.so"
-    echo "Compiling as a shared library..."
-else
-    OUTPUT_FILE="${BUILD_DIR}/main"
-    echo "Compiling as an executable..."
-fi
+# Source files
+SRC_FILES = $(shell find $(SRC_DIR) -name '*.c')
 
-# Verify build directory
-mkdir -p "$BUILD_DIR"
+# Flags for parallelization
+.PHONY: parallel
+parallel:
+	$(eval PARALLEL_FLAG = -DENABLE_PARALLEL)
+	@echo "Compiling with parallelization enabled..."
 
-# Get source files
-SRC_FILES=$(find "$SRC_DIR" -name '*.c' -print | tr '\n' ' ')
+# Flags for debugging
+.PHONY: diag
+diag:
+	$(eval DEBUG_FLAG = -g)
+	@echo "Debugging with lldb enabled..."
 
-# Compile with flags
-if [[ -n "$SHARED_FLAG" ]]; then
-    # Compile as shared library
-    gcc-14 -O3 -arch x86_64 $PARALLEL_FLAG -march=native -funroll-loops -ftree-vectorize -fopenmp \
-        -I"$INCLUDE_DIR" $SHARED_FLAG -o "$OUTPUT_FILE" $SRC_FILES
-else
-    # Compile as executable
-    gcc-14 -O3 $PARALLEL_FLAG -march=native -funroll-loops -ftree-vectorize -fopenmp \
-        -I"$INCLUDE_DIR" -o "$OUTPUT_FILE" $SRC_FILES
-fi
+# Shared library target
+.PHONY: shared
+shared: 
+	$(eval SHARED_FLAG = -shared -fPIC)
+	$(eval OUTPUT_FILE = $(SHARED_LIB))
+	@echo "Compiling as a shared library..."
 
-# Check compilation 
-if [ $? -eq 0 ]; then
-    echo "Compilation successful."
+# Executable target
+.PHONY: executable
+executable: 
+	$(eval OUTPUT_FILE = $(EXEC_FILE))
+	@echo "Compiling as an executable..."
 
-else
-    echo "Error compiling C code."
-    exit 1
-fi
+# Default target to build project
+.PHONY: all
+all: $(OUTPUT_FILE)
 
-# Clean up compiled objects and executable or shared library
-echo "Cleaning up compiled objects..."
-make clean
+# Rule to build the shared library or executable
+$(OUTPUT_FILE): $(SRC_FILES)
+	$(CC) $(CFLAGS) $(PARALLEL_FLAG) $(DEBUG_FLAG) $(SHARED_FLAG) -I$(INCLUDE_DIR) -o $(OUTPUT_FILE) $(SRC_FILES)
+
+# Clean up compiled objects
+.PHONY: clean
+clean:
+	rm -rf $(BUILD_DIR)/*.o $(BUILD_DIR)/main $(BUILD_DIR)/libnn.so
+	@echo "Cleaned up compiled objects and executables."
