@@ -31,7 +31,6 @@ __pycache__/
 
 # VS Code 
 .vscode/
-.idea/
 *.code-workspace
 
 # Generated documentation
