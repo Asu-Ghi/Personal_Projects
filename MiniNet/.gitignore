@@ -1,0 +1,50 @@
+# Compiled files and binaries
+*.o
+*.out
+*.so
+*.dll
+*.exe
+*.dylib
+
+# Build files
+build/
+*.log
+*.aux
+*.tmp
+
+# macOS files
+.DS_Store
+
+# Python cache and env
+__pycache__/
+*.pyc
+*.pyo
+.env
+.venv
+
+# Backup files
+*~
+*.bak
+*.swp
+*.swo
+*.old
+
+# VS Code 
+.vscode/
+.idea/
+*.code-workspace
+
+# Generated documentation
+docs/_build/
+
+# Shared lib
+libnn.so
+
+*.d
+*.dep
+
+# Debugging
+*.core
+*.dSYM/
+
+
