@@ -136,9 +136,24 @@ Includes dimensionality checks.
 double vector_dot_product(matrix* w, matrix* v);
 
 /*
-Returns a matrix scaled by s.
+Scales a matrix w by a scalar s.
 */
 void matrix_scalar_mult(matrix* w, double s);
+
+
+/*
+Returns matrix sum of w and v
+Includes dimensionality checks.
+Allocates memory on the heap for the return matrix
+*/
+matrix* matrix_sum(matrix* w, matrix* v);
+
+/*
+Returns a matrix of scalar sum between matrix
+w and scalar s. 
+Allocates memory on the heap for the return matrix
+*/
+matrix* matrix_scalar_sum(matrix* w, double s);
 
 
 #endif

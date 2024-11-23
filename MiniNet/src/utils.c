@@ -472,5 +472,111 @@ void matrix_scalar_mult(matrix* w, double s) {
 
 }
 
+// Includes ifdef for parallelization
+matrix* matrix_sum(matrix* w, matrix* v) {
+
+    // Check dimensions
+    if (w->dim1 != v->dim1 || w->dim2 != v->dim2) {
+        fprintf(stderr, "Error, Dimensionality Mismatch in Matrix Sum.\n");
+        exit(1);
+    }
+
+    // Allocate memory for the return object
+    matrix* result = malloc(sizeof(matrix));
+    result->dim1 = w->dim1;
+    result->dim2 = w->dim2;
+    result->data = (double*) calloc(result->dim1 * result->dim2, sizeof(double));
+    
+    // Check memory allocation
+    if (result->data == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed in matrix sum.\n");
+        exit(1);
+    }
+
+    // Get dimensions
+    int row_w = w->dim1;
+    int col_w = w->dim2;
+
+// Parallel Code
+#ifdef ENABLE_PARALLEL
+    #pragma omp parallel
+    {   
+        // Init parallel constraints
+        int thread_id = omp_get_thread_num(); // Get current thread id
+        int total_threads = omp_get_num_threads(); // Get total num threads
+        int rows_per_thread = (row_w + total_threads - 1) / total_threads; // Get num rows to calc per each thread
+        int start_row = rows_per_thread * thread_id; // Get start row for unique thread
+        int end_row = rows_per_thread * thread_id + rows_per_thread; // Get end row for unique thread
+
+        // Check bounds
+        if (end_row > row_w) {
+            end_row = row_w;
+        }
+
+        // Parallel, each thread gets range from start to end row.
+        for (int i = start_row; i < end_row; i++) {
+            for (int j = 0; j < col_w; j++) {
+                result->data[i * col_w + j] = w->data[i * col_w + j] + v->data[i * col_w + j]; // Row major order
+            }
+        }
+    }
+
+
+// Sequential Code
+#else
+
+    for (int i = 0; i < row_w; i++) {
+        for (int j = 0; j < col_w; j++) {
+            result->data[i * col_w + j] = w->data[i * col_w + j] + v->data[i * col_w + j]; // Row major order
+        }
+    }
+
+#endif
+
+    return result;
+}
+
+// Includes ifdef for parallelization
+matrix* matrix_scalar_sum(matrix* w, double s) {
+
+    // Allocate memory for the result
+    matrix* result = malloc(sizeof(matrix));
+    result->dim1 = w->dim1;
+    result->dim2 = w->dim2;
+
+    // Check memory
+    if (result->data == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed in matrix scalar sum\n");
+        exit(1);
+    }
+
+
+#ifdef ENABLE_PARALLEL // Parallel approach
+
+    #pragma omp for schedule(static) // No race conditions, each thread gets its own i
+    for (int i = 0; i < result->dim1 * result->dim2; i++) {
+        result->data[i] += s;
+    }
+
+
+#else // Sequential Approach
+
+    for (int i = 0; i < result->dim1 * result->dim2; i++) {
+        result->data[i] += s;
+    }
+
+#endif
+
+    return result; // return pointer to matrix
+}
+
+
+
+
+
+
+
+
+
 
 

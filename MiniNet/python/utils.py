@@ -1,4 +1,6 @@
 from nn_bindings import *
+import matplotlib.pyplot as plt
+import numpy as np
 
 # Returns a matrix object from a numpy array
 def numpy_to_matrix(array):

@@ -117,12 +117,18 @@ void pred_forward_pass(matrix* inputs, layer_dense* layer);
 /*
 Forward Pass for layers with ReLu
 */
-void forward_reLu(matrix* batch_input);
+matrix* forward_reLu(matrix* batch_input);
 
 /*
 Forward Pass for layers with softMax
 */
-void forward_softMax(matrix* batch_input);
+matrix* forward_softMax(matrix* batch_input);
+
+/*
+Forward Pass for layers with sigMoid
+*/
+matrix* forward_sigmoid(matrix* inputs);
+
 
 ////////////////////////////////////////////////// BACKWARD METHODS ///////////////////////////////////////////////////////////////////////////
 
@@ -132,9 +138,14 @@ Backward pass for layers with ReLu
 void backward_reLu(matrix* input_gradients, layer_dense* layer);
 
 /*
-Backward pass for layers with ReLu
+Backward pass for layers with SoftMax
 */
 void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer);
+
+/*
+Backward pass for layers with Sigmoid
+*/
+void backwards_sigmoid(matrix* input_gradients, layer_dense* layer);
 
 /*
 Calculate relu gradients -> used in backward_relu
@@ -147,6 +158,13 @@ Calculate softmax gradients -> used in backward_softmax_loss
 Has flags for parallelization using omp
 */
 void calculate_softmax_gradients(matrix* softmax_gradients, layer_dense* layer, matrix* true_labels);
+
+/*
+Calculate sigmoid gradients -> used in backward_sigmoid
+Has flags for parallelization using omp
+*/
+void calculate_sigmoid_gradients(matrix* sigmoid_gradients, layer_dense* layer);
+
 
 /*
 Calculate bias gradients -> used in backward_relu and backward_softmax

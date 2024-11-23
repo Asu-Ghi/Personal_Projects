@@ -739,21 +739,6 @@ void forward_pass(matrix* inputs, layer_dense* layer) {
         }
     }
 
-    // Allocate memory for post activation outputs
-    if (layer->post_activation_output == NULL) {
-        layer->post_activation_output = malloc(sizeof(matrix));
-        layer->post_activation_output->dim1 = inputs->dim1;
-        layer->post_activation_output->dim2 = layer->num_neurons;
-        layer->post_activation_output->data = (double*) calloc(layer->post_activation_output->dim1*
-                                                        layer->post_activation_output->dim2, sizeof(double));
-    
-       // Check memory allocation
-        if (layer->post_activation_output->data == NULL) {
-            fprintf(stderr, "Error in memory allocation for post_activation_output in forward pass.\n");
-            exit(1);
-        }
-    }
-
     /* 
     num_inputs x num_neurons
     Perform matrix multiplication between inputs (dim1 x dim2) and weights (dim2 x dim3)
@@ -774,16 +759,27 @@ void forward_pass(matrix* inputs, layer_dense* layer) {
 
     // relu activation
     if (layer->activation == RELU) {
-        forward_reLu(layer->pre_activation_output);
+        // Handles memory allocation for post activation outputs
+        layer->post_activation_output = forward_reLu(layer->pre_activation_output);
     } 
+
     // softmax activation
     else if(layer->activation == SOFTMAX) {
-        forward_softMax(layer->pre_activation_output);
+        // Handles memory allocation for post activation outputs
+        layer->post_activation_output = forward_softMax(layer->pre_activation_output);
     }
 
-    // Update post activation outputs
-    memcpy(layer->post_activation_output->data,  layer->pre_activation_output->data, layer->pre_activation_output->dim1 * 
-                            layer->pre_activation_output->dim2 * sizeof(double));
+    // sigmoid activation
+    else if(layer->activation == SIGMOID) {
+        // Handles memory allocation for post activation outputs
+        layer->post_activation_output = forward_sigmoid(layer->pre_activation_output);
+    }
+
+    // Check memory allocation
+    if (layer->post_activation_output->data == NULL) {
+        fprintf(stderr, "Error in memory allocation for post_activation_output in forward pass.\n");
+        exit(1);
+    }
 
     // Apply dropout
     if (layer->drop_out_rate > 0.0) {
@@ -847,31 +843,99 @@ void pred_forward_pass(matrix* inputs, layer_dense* layer) {
     
     // relu activation
     if (layer->activation == RELU) {
-        forward_reLu(layer->pred_outputs);
+        matrix* temp = forward_reLu(layer->pred_outputs);
+        free(layer->pred_outputs->data);
+        layer->pred_outputs->data = temp->data;
+        layer->pred_outputs->dim1 = temp->dim1;
+        layer->pred_outputs->dim2 = temp->dim2;
+        free(temp);
     } 
     // softmax activation
     else if(layer->activation == SOFTMAX) {
-        forward_softMax(layer->pred_outputs);
+        matrix* temp = forward_softMax(layer->pred_outputs);
+        free(layer->pred_outputs->data);
+        layer->pred_outputs->data = temp->data;
+        layer->pred_outputs->dim1 = temp->dim1;
+        layer->pred_outputs->dim2 = temp->dim2;
+        free(temp);
+    }
+
+    // sigmoid activation
+    else if(layer->activation == SIGMOID) {
+        // Handles memory allocation for post activation outputs
+        matrix* temp = forward_sigmoid(layer->pred_outputs);
+        free(layer->pred_outputs->data);
+        layer->pred_outputs->data = temp->data;
+        layer->pred_outputs->dim1 = temp->dim1;
+        layer->pred_outputs->dim2 = temp->dim2;
+        free(temp);  
     }
 }
 
-void forward_reLu(matrix* batch_input) {
-    // iterate through every point in the batch input
+matrix* forward_reLu(matrix* batch_input) {
 
-    // #pragma omp for schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
+    // Allocate memory for return matrix
+    matrix* outputs = malloc(sizeof(matrix));
+    outputs->dim1 = batch_input->dim1;
+    outputs->dim2 = batch_input->dim2;
+    outputs->data = (double*) calloc(outputs->dim1 * outputs->dim2, sizeof(double));
+
+    // Check memory allocation
+    if (outputs->data == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed in forward relu.\n");
+        exit(1);
+    }
+
+#ifdef ENABLE_PARALLEL // Parallel Approach
+
+    #pragma omp for schedule(static)
     for (int i = 0; i < batch_input->dim1 * batch_input->dim2; i++){
 
         // if the input value is <= 0, rectify it to 0 (otherwise, leave it unchanged)
         if(batch_input->data[i] <= 0) {
-            batch_input->data[i] = 0;
+            outputs->data[i] = 0;
+        }
+        else {
+            outputs->data[i] = batch_input->data[i];
         }
     }
+
+#else // Sequential Approach
+
+    // iterate through every point in the batch input
+    for (int i = 0; i < batch_input->dim1 * batch_input->dim2; i++){
+
+        // if the input value is <= 0, rectify it to 0 (otherwise, leave it unchanged)
+        if(batch_input->data[i] <= 0) {
+            outputs->data[i] = 0;
+        }
+        else {
+            outputs->data[i] = batch_input->data[i];
+        }
+    }
+#endif
+
+    // Return post activation outputs.
+    return outputs;
 }
 
-void forward_softMax(matrix* batch_input) {
+matrix* forward_softMax(matrix* batch_input) {
+
+    // Allocate memory for outputs
+    matrix* outputs = malloc(sizeof(matrix));
+    outputs->dim1 = batch_input->dim1;
+    outputs->dim2 = batch_input->dim2;
+
+    // Check memory
+    if (outputs->data == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed in forward softmax.\n");
+        exit(1);
+    }
+
+#ifdef ENABLE_PARALLEL // Parallel approach (Not implemented)
+
     // iterate over the batch
-    // #pragma omp for schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
-    for(int i = 0; i < batch_input -> dim1; i++) {
+    for(int i = 0; i < outputs -> dim1; i++) {
 
         //step 1: Subtract maximum value from each value in the input batch to ensure numerical stability (no large exponentiations)
         double max = -DBL_MAX;
@@ -890,13 +954,100 @@ void forward_softMax(matrix* batch_input) {
         }
 
         // step 3: normalize exponentials by dividing by the sum to get probabilities
-        for(int j = 0; j < batch_input->dim2; j++) {
-            batch_input->data[i * batch_input->dim2 + j] = exp_values[j] / sum;
+        for(int j = 0; j < outputs->dim2; j++) {
+            outputs->data[i * outputs->dim2 + j] = exp_values[j] / sum;
+        }
+
+        // step 4: free temp exp values 
+        free(exp_values);
+    } 
+
+# else // Sequential Approach
+
+    // iterate over the batch
+    for(int i = 0; i < outputs -> dim1; i++) {
+
+        //step 1: Subtract maximum value from each value in the input batch to ensure numerical stability (no large exponentiations)
+        double max = -DBL_MAX;
+        for(int j = 0; j < batch_input->dim2; j++){
+            if (batch_input->data[i*batch_input->dim2 + j] > max) {
+                max = batch_input->data[i*batch_input->dim2 + j];
+            }
+        }
+
+        // step 2: calculate exponentials and sum them
+        double* exp_values = (double*) calloc(batch_input->dim2, sizeof(double));
+        double sum = 0.0;
+        for(int j = 0; j < batch_input -> dim2; j++) {
+            exp_values[j] = exp(batch_input->data[i * batch_input->dim2 + j] - max);
+            sum += exp_values[j];
+        }
+
+        // step 3: normalize exponentials by dividing by the sum to get probabilities
+        for(int j = 0; j < outputs->dim2; j++) {
+            outputs->data[i * outputs->dim2 + j] = exp_values[j] / sum;
         }
 
         // step 4: free temp exp values 
         free(exp_values);
     }
+
+#endif 
+
+    // Return post activation outputs
+    return outputs;
+}
+
+matrix* forward_sigmoid(matrix* inputs) {
+    // Allocate Memory for outputs
+    matrix* outputs = malloc(sizeof(matrix));
+    outputs->dim1 = inputs->dim1;
+    outputs->dim2 = inputs->dim2;
+    outputs->data = (double*) calloc(outputs->dim1 * outputs->dim2, sizeof(double));
+
+    if (outputs->data == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed in forwrad sigma.\n");
+        exit(1);
+    }
+
+   int row_outputs = outputs->dim1;
+   int cols_outputs = outputs->dim2;
+
+#ifdef ENABLE_PARALLEL // Parallel Approach
+#pragma omp parallel 
+{
+    int thread_id = omp_get_thread_num(); // Get current thread id
+    int total_threads = omp_get_num_threads(); // Get total num threads
+    int rows_per_thread = (row_outputs + total_threads - 1) / total_threads; // Get num rows to calc per each thread
+    int start_row = rows_per_thread * thread_id; // Get start row for unique thread
+    int end_row = rows_per_thread * thread_id + rows_per_thread; // Get end row for unique thread
+
+    // check bounds
+    if (end_row > row_outputs) {
+        end_row = row_outputs;
+    }
+
+    // Each thread gets a region to compute the softmax
+    for (int i = start_row; i < end_row; i++) {
+        for (int j = 0; j < cols_outputs; j++) {
+            outputs->data[i * cols_outputs + j] = 1.0  / (1 + exp(-1 * inputs->data[i * cols_outputs + j]));
+        }
+    }
+
+}
+
+#else // Sequential Approach
+
+    // Inputs corespond to the outputs (z of the current layer)
+    for (int i = 0; i < outputs->dim1; i++) {
+        for (int j = 0; j < outputs->dim2; j++) {
+            outputs->data[i * outputs->dim2 + j] = 1.0  / (1 + exp(-1 * inputs->data[i * inputs->dim2 + j]));
+        }
+    }
+
+#endif
+    // return outputs
+    return outputs;
 }
 
 
@@ -1198,6 +1349,67 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
     free(loss_gradients);
 }
 
+void backwards_sigmoid(matrix* input_gradients, layer_dense* layer) {
+    /*
+    Step 1: Calculate Sigmoid Gradients
+    The element by element product of the sigmoid outputs and 1 - the sigmoid outputs and the input
+    gradients from the layer above the current one.
+    */   
+   
+    matrix* sigmoid_gradients = malloc(sizeof(matrix));
+    sigmoid_gradients->dim1 = layer->post_activation_output->dim1;
+    sigmoid_gradients->dim2 = layer->post_activation_output->dim2;
+    if (sigmoid_gradients->data == NULL) {
+        fprintf(stderr, "Error: Memory allocation failure in backwards sigmoid\n");
+        exit(1);
+    }
+
+    if (input_gradients->dim1 != sigmoid_gradients->dim2 || input_gradients->dim2 != sigmoid_gradients->dim2) {
+        fprintf(stderr, "Error, mismatching dimensions between input gradients and sigmoid gradients.\n");
+        exit(1);
+    }
+
+    // Calculate derivative of sigmoid function
+    calculate_sigmoid_gradients(sigmoid_gradients, layer); // supports parallel
+
+    // Calculate derivative with respect to input gradients
+    sigmoid_gradients = element_matrix_mult(sigmoid_gradients, input_gradients); // supports parallel
+
+
+    /*
+    Step 2: Calculate Weight Gradients
+    The dot product of the layers Inputs Transposed and the sigmoid gradients calculated above.
+    */
+    matrix* inputs_transposed = transpose_matrix(layer->inputs);
+
+    layer->dweights = matrix_mult(inputs_transposed, sigmoid_gradients);
+
+    free(inputs_transposed->data);
+    free(inputs_transposed);
+
+    /*
+    Step 3: Calculate the Bias Gradients
+    The sum of the input gradients across each sample in the batch.
+    */
+
+    calculate_bias_gradients(sigmoid_gradients, layer); // directly accesses the layer biases
+
+    /*
+    Step 4: Calculate the Input Gradients
+    The dot product of the actvation functions gradients and weights transposed.
+    */
+
+    matrix* weights_transposed = transpose_matrix(layer->weights);
+
+    layer->dinputs = matrix_mult(sigmoid_gradients, weights_transposed);
+
+    free(weights_transposed->data);
+    free(weights_transposed);
+
+
+    exit(1);
+}
+
 void calculate_relu_gradients(matrix* relu_gradients, layer_dense* layer) {
 
     // Check if correct dimensions 
@@ -1292,6 +1504,22 @@ void calculate_softmax_gradients(matrix* softmax_gradients, layer_dense* layer, 
 
 
 }
+
+void calculate_sigmoid_gradients(matrix* sigmoid_gradients, layer_dense* layer) {
+    // Check dimensions
+    if (sigmoid_gradients->dim1 != layer->post_activation_output->dim1 || 
+        sigmoid_gradients->dim1 != layer->post_activation_output->dim2) {
+            fprintf(stderr, "Error: Dimensionality mismatch in calculate sigmoid gradients.\n");
+            exit(1);
+    }
+
+    // Calculate 1 - sigmoid outputs
+    matrix* sigmoid_diff = matrix_scalar_sum(layer->post_activation_output, -1); // supports parallel
+    
+    // Element wise multiplication 
+    sigmoid_gradients = element_matrix_mult(layer->post_activation_output, sigmoid_diff); // supports parallel
+
+}   
 
 void calculate_bias_gradients(matrix* input_gradients, layer_dense* layer) {
 
@@ -1544,9 +1772,67 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
     float min_learning_rate = 1e-6;
     *learning_rate = fmax(*learning_rate, min_learning_rate);
 
+
+#ifdef ENABLE_PARALLEL
+
+    // Weights
+    #pragma omp for schedule(static)
+    for (int i = 0; i < layer->dweights->dim1 * layer->dweights->dim2; i++) {
+
+        // Update Momentum
+        layer->w_velocity->data[i] = beta_1 * layer->w_velocity->data[i] + (1.0 - beta_1) * layer->dweights->data[i];
+        
+        // Correct Momentum
+        if (correctBias) {
+            double log_beta_1 = log(beta_1);
+            layer->w_velocity->data[i] = layer->w_velocity->data[i] / (1.0 - exp((t + 1) * log_beta_1)); // Bias correction for weights momentum
+        }
+
+        // Update cache 
+        layer->cache_weights->data[i] = beta_2 * layer->cache_weights->data[i] + (1.0 - beta_2) * layer->dweights->data[i] * layer->dweights->data[i];
+        
+        // Correct cache
+        if (correctBias) {
+            double log_beta_2 = log(beta_2);
+            layer->cache_weights->data[i] = layer->cache_weights->data[i] / (1.0 - exp((t + 1) * log_beta_2)); // Bias correction for weight cache
+        }
+
+        // Update Weights using corrected moments and cache
+        layer->weights->data[i] -= (*learning_rate) * layer->w_velocity->data[i] / (sqrt(layer->cache_weights->data[i]) + epsilon);
+    }
+    
+
+    // Biases
+    #pragma omp for schedule(static)
+    for (int i = 0; i < layer->dbiases->dim1 * layer->dbiases->dim2; i++) {
+        // Update Momentum
+        layer->b_velocity->data[i] = beta_1 * layer->b_velocity->data[i] + (1.0 - beta_1) * layer->dbiases->data[i];
+        
+        // Correct Momentum
+        if (correctBias) {
+            double log_beta_1 = log(beta_1);
+            layer->b_velocity->data[i] = layer->b_velocity->data[i] / (1.0 - exp((t + 1) * log_beta_1)); // Bias correction for bias momentum
+        }
+        
+        // Update cache 
+        layer->cache_bias->data[i] = beta_2 * layer->cache_bias->data[i] + (1.0 - beta_2) * layer->dbiases->data[i] * layer->dbiases->data[i];
+        
+        // Correct cache
+        if (correctBias) {
+            double log_beta_2 = log(beta_2);
+            layer->cache_bias->data[i] = layer->cache_bias->data[i] / (1.0 - exp((t + 1) * log_beta_2)); // Bias correction for bias cache
+        }
+
+        // Update Bias using corrected moments and cache
+        layer->biases->data[i] -= (*learning_rate) * layer->b_velocity->data[i] / (sqrt(layer->cache_bias->data[i]) + epsilon);
+    }
+
+
+# else 
     // Weights
     for (int i = 0; i < layer->dweights->dim1 * layer->dweights->dim2; i++) {
-    // Update Momentum
+
+        // Update Momentum
         layer->w_velocity->data[i] = beta_1 * layer->w_velocity->data[i] + (1.0 - beta_1) * layer->dweights->data[i];
         
         // Correct Momentum
@@ -1576,7 +1862,8 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
         
         // Correct Momentum
         if (correctBias) {
-            layer->b_velocity->data[i] = layer->b_velocity->data[i] / (1.0 - pow(beta_1, t + 1)); // Bias correction for bias momentum
+            double log_beta_1 = log(beta_1);
+            layer->b_velocity->data[i] = layer->b_velocity->data[i] / (1.0 - exp((t + 1) * log_beta_1)); // Bias correction for bias momentum
         }
         
         // Update cache 
@@ -1584,12 +1871,15 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
         
         // Correct cache
         if (correctBias) {
-            layer->cache_bias->data[i] = layer->cache_bias->data[i] / (1.0 - pow(beta_2, t + 1)); // Bias correction for bias cache
+            double log_beta_2 = log(beta_2);
+            layer->cache_bias->data[i] = layer->cache_bias->data[i] / (1.0 - exp((t + 1) * log_beta_2)); // Bias correction for bias cache
         }
 
         // Update Bias using corrected moments and cache
         layer->biases->data[i] -= (*learning_rate) * layer->b_velocity->data[i] / (sqrt(layer->cache_bias->data[i]) + epsilon);
     }
+
+#endif 
 }
 
 void optimization_dense(layer_dense* layer, double* lr, double lr_decay, int current_epoch, double beta1, double beta2,
@@ -1617,3 +1907,5 @@ void optimization_dense(layer_dense* layer, double* lr, double lr_decay, int cur
 
 
 }
+
+

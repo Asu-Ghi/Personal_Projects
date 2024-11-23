@@ -36,8 +36,14 @@ __pycache__/
 # Generated documentation
 docs/_build/
 
+# Bash files
+compile_run.sh
+
 # Shared lib
 libnn.so
+
+# Pycache
+*.pyc
 
 *.d
 *.dep

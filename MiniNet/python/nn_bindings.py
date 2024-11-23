@@ -1,9 +1,7 @@
 import ctypes
-import matplotlib.pyplot as plt
-import numpy as np
 
 # Load shared library
-libnn = ctypes.CDLL('./libnn.so')  
+libnn = ctypes.CDLL('../build/libnn.so')  
 
 ########################################################## CTYPE STRUCTS ############################################################
 
@@ -160,7 +158,7 @@ libnn.backward_pass_nn.restype = None # Returns Void
 libnn.update_parameters.argtypes = [
     ctypes.POINTER(NeuralNetwork), # Network
 ]
-libnn.update_parametrs.restype = None # Returns void
+libnn.update_parameters.restype = None # Returns void
 
 
 # Train Neural Net Method
