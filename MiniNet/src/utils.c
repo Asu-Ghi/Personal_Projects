@@ -580,3 +580,4 @@ matrix* matrix_scalar_sum(matrix* w, double s) {
 
 
 
+

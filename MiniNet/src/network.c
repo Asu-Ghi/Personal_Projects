@@ -1,5 +1,7 @@
 #include "network.h"
 
+
+
 NeuralNetwork* init_neural_network(int num_layers, int* num_neurons_in_layer, double learning_rate,
                                    ActivationType* activations, OptimizationType* optimizations, bool* regularizations, int num_batch_features) {
 

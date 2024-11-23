@@ -3,7 +3,7 @@
         {
             "name": "Mac",
             "includePath": [
-                "${workspaceFolder}/MiniNet/include",
+                "${workspaceFolder}/MiniNet/include/",
                 "${workspaceFolder}/MiniNet/tests/include",
                 "/opt/homebrew/opt/libomp/include"
             ],
@@ -11,7 +11,7 @@
             "macFrameworkPath": [
                 "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
             ],
-            "compilerPath": "/opt/homebrew/bin/gcc",
+            "compilerPath": "/opt/homebrew/opt/llvm/bin/clang",
             "cStandard": "c17",
             "cppStandard": "c++17",
             "intelliSenseMode": "macos-gcc-x64",

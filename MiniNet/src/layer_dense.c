@@ -700,6 +700,7 @@ void forward_pass(matrix* inputs, layer_dense* layer) {
         layer->inputs = malloc(sizeof(matrix));
         layer->inputs->dim1 = inputs->dim1;
         layer->inputs->dim2 = inputs->dim2;
+        printf("%d x %d\n", inputs->dim1, inputs->dim2);
         layer->inputs->data = (double*) calloc(layer->inputs->dim1 * layer->inputs->dim2, sizeof(double));
         // Check memory allocation
         if (layer->inputs->data == NULL) {
@@ -739,6 +740,10 @@ void forward_pass(matrix* inputs, layer_dense* layer) {
         }
     }
 
+    if (layer->post_activation_output == NULL) {
+        layer->post_activation_output = malloc(sizeof(matrix));
+    }
+
     /* 
     num_inputs x num_neurons
     Perform matrix multiplication between inputs (dim1 x dim2) and weights (dim2 x dim3)
@@ -749,7 +754,6 @@ void forward_pass(matrix* inputs, layer_dense* layer) {
     // Add biases for the layer to the batch output data
     // batch_size x num_neurons, where output dim1 -> batch size
 
-    // #pragma omp for collapse(2) schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
     for (int i = 0; i < layer->pre_activation_output->dim1; i++) {
         // output dim2-> num neurons
         for (int j = 0; j < layer->pre_activation_output->dim2; j++) {
@@ -773,6 +777,7 @@ void forward_pass(matrix* inputs, layer_dense* layer) {
     else if(layer->activation == SIGMOID) {
         // Handles memory allocation for post activation outputs
         layer->post_activation_output = forward_sigmoid(layer->pre_activation_output);
+        printf("dim %d x %d\n", layer->post_activation_output->dim1, layer->post_activation_output->dim2);
     }
 
     // Check memory allocation

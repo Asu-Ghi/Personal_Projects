@@ -22,9 +22,9 @@ int main(int argc, char** argv) {
     matrix X_train, Y_train, X_test, Y_test; // Create matrix objects for data loading
     int num_batches = 150; // 120 training examples in Iris dataset
     double train_ratio = 0.1; // 80% of the data used for training
-    
+
     // Load Iris Data Set    
-    load_iris_data(file_path, &X_train, &Y_train, &X_test, &Y_test, num_batches, train_ratio);
+    // load_iris_data(file_path, &X_train, &Y_train, &X_test, &Y_test, num_batches, train_ratio);
 
     // Load spiral data
     // Init training
@@ -50,18 +50,18 @@ int main(int argc, char** argv) {
     // load_data("../DataSets/Spiral/train_data.csv", spiral_train.data, 0, 300, 2);
     // load_data("../DataSets/Spiral/train_labels.csv", spiral_pred.data, 0, 300, 3);
 
-    load_data("../data/Spiral/train_data_1000.csv", spiral_train.data, 0, 750, 2);
-    load_data("../data/Spiral/train_labels_1000.csv", spiral_pred.data, 0, 750, 3);
+    load_data("data/Spiral/train_data_1000.csv", spiral_train.data, 0, 750, 2);
+    load_data("data/Spiral/train_data_1000.csv", spiral_pred.data, 0, 750, 3);
 
 
     // Load validating
-    load_data("../data/Spiral/test_data.csv", spiral_test.data, 0, 100, 2);
-    load_data("../data/Spiral/test_labels.csv", spiral_test_pred.data, 0, 100, 3);
+    load_data("data/Spiral/test_data.csv", spiral_test.data, 0, 100, 2);
+    load_data("data/Spiral/test_labels.csv", spiral_test_pred.data, 0, 100, 3);
 
     int spiral_num_features = 2;
     int spiral_neurons_in_layer[3] = {512, 256, 3}; // Num neurons in a layer
-    ActivationType spiral_activations_per_layer[3] = {RELU, SOFTMAX}; // size num layers
-    OptimizationType spiral_optimizations_per_layer[3] = {ADAM, ADAM}; // size num layers
+    ActivationType spiral_activations_per_layer[3] = {RELU, RELU, SOFTMAX}; // size num layers
+    OptimizationType spiral_optimizations_per_layer[3] = {ADAM, ADAM, ADAM}; // size num layers
     bool spiral_regularization_per_layer[3] = {true, true, true}; // size num layers
 
     // Find best lr

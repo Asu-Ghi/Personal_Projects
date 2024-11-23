@@ -72,8 +72,6 @@ def main():
         ctypes.addressof(Y_Pred)
     )
 
-    # 
-
 
 
     
