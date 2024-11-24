@@ -19,7 +19,6 @@ void clip_gradients(matrix* gradients, double clip_value) {
 
 
 void apply_drop_out(layer_dense* layer, double drop_out_rate) {
-
     // Allocate memory for binary mask if it doesnt exist
     if (layer->binary_mask == NULL) {
         layer->binary_mask = malloc(sizeof(matrix));
@@ -32,7 +31,6 @@ void apply_drop_out(layer_dense* layer, double drop_out_rate) {
             fprintf(stderr,"Error: Memory allocation for binary mask failed.\n");
             exit(1);
         }
-
     }
 
 #ifdef ENABLE_PARALLEL
@@ -381,7 +379,7 @@ double pred_calculate_accuracy(matrix* class_targets, layer_dense* final_layer, 
 
     // handles mismatching first dimensions 
     if (class_targets->dim1 != final_layer->pred_outputs->dim1) {
-        fprintf(stderr, "Error: Mismatching dimensions in calculate accuracy, dim1 for class targets and predictions.\n");
+        fprintf(stderr, "Error: Mismatching dimensions in pred calculate accuracy, dim1 for class targets and predictions.\n");
         exit(1);
     } 
 
@@ -700,7 +698,6 @@ void forward_pass(matrix* inputs, layer_dense* layer) {
         layer->inputs = malloc(sizeof(matrix));
         layer->inputs->dim1 = inputs->dim1;
         layer->inputs->dim2 = inputs->dim2;
-        printf("%d x %d\n", inputs->dim1, inputs->dim2);
         layer->inputs->data = (double*) calloc(layer->inputs->dim1 * layer->inputs->dim2, sizeof(double));
         // Check memory allocation
         if (layer->inputs->data == NULL) {
@@ -777,7 +774,7 @@ void forward_pass(matrix* inputs, layer_dense* layer) {
     else if(layer->activation == SIGMOID) {
         // Handles memory allocation for post activation outputs
         layer->post_activation_output = forward_sigmoid(layer->pre_activation_output);
-        printf("dim %d x %d\n", layer->post_activation_output->dim1, layer->post_activation_output->dim2);
+        // printf("dim %d x %d\n", layer->post_activation_output->dim1, layer->post_activation_output->dim2);
     }
 
     // Check memory allocation
@@ -930,7 +927,7 @@ matrix* forward_softMax(matrix* batch_input) {
     matrix* outputs = malloc(sizeof(matrix));
     outputs->dim1 = batch_input->dim1;
     outputs->dim2 = batch_input->dim2;
-
+    outputs->data = (double*) calloc(outputs->dim1 * outputs->dim2, sizeof(double));
     // Check memory
     if (outputs->data == NULL) {
         fprintf(stderr, "Error: Memory allocation failed in forward softmax.\n");
@@ -1077,6 +1074,11 @@ void backward_reLu(matrix* input_gradients, layer_dense* layer) {
         exit(1);
     }
 
+    // If using dropout, apply
+    if (layer->drop_out_rate > 0.0) {
+        apply_dropout_gradients(relu_gradients, layer);
+    }
+
     // Iterate through every value in layer post activation output to get relu gradients
     calculate_relu_gradients(relu_gradients, layer); // supports parallel
 
@@ -1155,11 +1157,6 @@ void backward_reLu(matrix* input_gradients, layer_dense* layer) {
 
     // Dot product of relu_gradients and weights transposed
     layer->dinputs = matrix_mult(relu_and_input_grads, weights_transposed); // supports parallel
-
-    // If using dropout, apply
-    if (layer->drop_out_rate > 0.0) {
-        apply_dropout_gradients(layer); // supports parallel
-    }
 
     // If clipping gradients, apply
     if (layer->clip_value > 0) {
@@ -1310,12 +1307,6 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
 
     // Calculate backprop derivative to pass to layer previous
     layer->dinputs = matrix_mult(loss_gradients, weights_transposed); // supports parallel
-
-
-    // If using dropout, apply
-    if (layer->drop_out_rate > 0.0) {
-        apply_dropout_gradients(layer); // supports parallel
-    }
 
     // If clipping gradients, apply
     if (layer->clip_value > 0) {
@@ -1615,17 +1606,23 @@ void apply_regularization_gradients(layer_dense* layer) {
 #endif
 }
 
-void apply_dropout_gradients(layer_dense* layer) {
-#ifdef ENABLE_PARALLEL
+void apply_dropout_gradients(matrix* input_gradients, layer_dense* layer) {
+    // Check dims
+    if (input_gradients->dim1 != layer->binary_mask->dim1 || input_gradients->dim2 != layer->binary_mask->dim2) {
+        fprintf(stderr, "Error: Mismatching dimensions between input gradients and binary mask in apply dropout gradients.\n");
+        exit(1);
+    }
+
+#ifdef ENABLE_PARALLEL // Parallel approach
 
     #pragma omp for schedule(static)
-    for (int i = 0; i < layer->dinputs->dim1 * layer->dinputs->dim2; i++) {
-        layer->dinputs->data[i] *= layer->binary_mask->data[i];
+    for (int i = 0; i < input_gradients->dim1 * input_gradients->dim2; i++) {
+        input_gradients->data[i] *= layer->binary_mask->data[i];
     }
 
 #else
-    for (int i = 0; i < layer->dinputs->dim1 * layer->dinputs->dim2; i++) {
-        layer->dinputs->data[i] *= layer->binary_mask->data[i];
+    for (int i = 0; i < input_gradients->dim1 * input_gradients->dim2; i++) {
+        input_gradients->data[i] *= layer->binary_mask->data[i];
     }
 #endif
 }

@@ -182,7 +182,7 @@ void apply_regularization_gradients(layer_dense* layer);
 Calculates gradients for binary mask drop applied to outputs-> used in backward_relu and backward_softmax
 Has flags for parallelization using omp
 */
-void apply_dropout_gradients(layer_dense* layer);
+void apply_dropout_gradients(matrix* input_gradients, layer_dense* layer);
 
 
 ////////////////////////////////////////////////// OPTIMIZER METHODS ///////////////////////////////////////////////////////////////////////////
