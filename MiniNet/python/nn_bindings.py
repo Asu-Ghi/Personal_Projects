@@ -2,7 +2,7 @@ import ctypes
 
 # Load shared library
 libnn = ctypes.CDLL('../build/libnn.so')  
-
+printf("Testing\n");
 ########################################################## CTYPE STRUCTS ############################################################
 
 # Label Types
