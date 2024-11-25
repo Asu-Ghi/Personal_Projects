@@ -1,8 +1,10 @@
 import ctypes
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 
 # Load shared library
 libnn = ctypes.CDLL('../build/libnn.so')  
-printf("Testing\n");
 ########################################################## CTYPE STRUCTS ############################################################
 
 # Label Types
@@ -13,21 +15,24 @@ class ClassLabelEncoding(ctypes.c_int):
 # Activation Functions
 class ActivationType(ctypes.c_int):
     RELU = 0
-    SIGMOID = 1
-    TANH = 2
+    SOFTMAX = 1
+    SIGMOID = 2
+    TANH = 3
 
 # Optimization Functions
 class OptimizationType(ctypes.c_int):
     SGD = 0
-    ADAM = 1
-    RMSPROP = 2
+    SGD_MOMENTUM = 1
+    ADA_GRAD = 2
+    RMS_PROP = 3
+    ADAM = 4
 
 # Define matrix structure
 class matrix(ctypes.Structure):
     _fields_ = [
         ("data", ctypes.POINTER(ctypes.c_double)),
-        ("dim1", ctypes.POINTER(ctypes.c_int)),
-        ("dim2", ctypes.POINTER(ctypes.c_int))
+        ("dim1", ctypes.c_int),
+        ("dim2", ctypes.c_int)
     ]
 
 # Define the layer_dense structure 

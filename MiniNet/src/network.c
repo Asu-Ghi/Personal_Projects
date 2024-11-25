@@ -21,7 +21,7 @@ NeuralNetwork* init_neural_network(int num_layers, int* num_neurons_in_layer, do
     n_network->current_epoch = 0; 
     n_network->momentum = false; 
     n_network->beta_1 = 0.90; // initializes to 0.9 -> Used for Momentum
-    n_network->beta_2 = 0.999; // initializes to 0.999 -> Used for Cachce
+    n_network->beta_2 = 0.90; // initializes to 0.999 -> Used for Cachce
     n_network->epsilon = 1e-7; // epsilon(ADA GRAD, RMSPROP)
     n_network->debug = true; // init to true
     n_network->accuracy = 0.0; // init to 0

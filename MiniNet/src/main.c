@@ -2,7 +2,7 @@
 
 #define NUM_FEATURES 4
 #define NUM_CLASSES 3
-#define NUM_THREADS 6
+#define NUM_THREADS 8
 
 /*
 Find best betas for optimization
