@@ -162,15 +162,6 @@ void backward_pass_nn(NeuralNetwork* network, matrix* y_pred) {
 
         if (network->layers[i]->activation == RELU){
             backward_reLu(network->layers[i+1]->dinputs, network->layers[i]);
-
-            // free(network->layers[i]->post_activation_output->data);
-            // free(network->layers[i]->post_activation_output);
-
-            // free(network->layers[i]->pre_activation_output->data);
-            // free(network->layers[i]->pre_activation_output);
-
-            // free(network->layers[i]->inputs->data);
-            // free(network->layers[i]->inputs);
         }
         else {
             printf("Not handled.\n");
@@ -264,6 +255,11 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
             batch_loss+= example_losses->data[i];
         }
         batch_loss = batch_loss/Y->dim1;
+        // Free examples losses
+        free(example_losses->data);
+        free(example_losses);
+        example_losses = NULL;
+
 
         #ifdef ENABLE_PARALLEL
         double loss_end_time = omp_get_wtime();
@@ -336,8 +332,6 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
             validate_time += (validate_end_time - validate_start_time);
             #endif
         }
-
-        
         // Print training data (if debug = TRUE)
         if (network->debug) {
             printf("Epoch %d: Total Model Loss = %f, Regularization Loss = %f, Model Accuracy = %f, LR = %f \n", epoch, batch_loss, 
@@ -427,5 +421,10 @@ void validate_model(NeuralNetwork* network, matrix* validate_data, matrix* valid
 
     // Get Accuracy
     *accuracy = pred_calculate_accuracy(validate_pred, network->layers[network->num_layers-1], ONE_HOT);
+
+    // Free examples losses
+    free(example_losses->data);
+    free(example_losses);
+    example_losses = NULL;
 } 
 

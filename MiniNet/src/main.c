@@ -2,7 +2,7 @@
 
 #define NUM_FEATURES 4
 #define NUM_CLASSES 3
-#define NUM_THREADS 1
+#define NUM_THREADS 6
 
 /*
 Find best betas for optimization
@@ -60,31 +60,31 @@ int main(int argc, char** argv) {
     load_data("data/Spiral/test_labels.csv", spiral_test_pred.data, 0, 300, 3);
 
     int spiral_num_features = 2;
-    int spiral_neurons_in_layer[2] = {512, 3}; // Num neurons in a layer
-    ActivationType spiral_activations_per_layer[2] = {RELU, SOFTMAX}; // size num layers
-    OptimizationType spiral_optimizations_per_layer[2] = {ADAM, ADAM}; // size num layers
-    bool spiral_regularization_per_layer[2] = {true, true}; // size num layers
+    int spiral_neurons_in_layer[3] = {512, 512, 3}; // Num neurons in a layer
+    ActivationType spiral_activations_per_layer[3] = {RELU, RELU, SOFTMAX}; // size num layers
+    OptimizationType spiral_optimizations_per_layer[3] = {ADAM, ADAM, ADAM}; // size num layers
+    bool spiral_regularization_per_layer[3] = {true, true, true}; // size num layers
 
     // Find best lr
-    int num_epochs = 10000;
+    int num_epochs = 50;
     double init_lr = 0.05;
     double decay_rate = 5e-5;
     int max_lr = 1;
     double lr_factor = 1.01;
     double epsilon = 1e-7;
-    double beta_1 = 0.9; // Momentums
+    double beta_1 = 0.85; // Momentums
     double beta_2 = 0.9; // RMS PROP CACHE
     double lambda1 = 5e-4;
     double lambda2 = 5e-4;
 
-    NeuralNetwork* network_spiral = init_neural_network(2, spiral_neurons_in_layer, init_lr,
+    NeuralNetwork* network_spiral = init_neural_network(3, spiral_neurons_in_layer, init_lr,
                                             spiral_activations_per_layer, spiral_optimizations_per_layer, spiral_regularization_per_layer, spiral_num_features);
     
     network_spiral->layers[0]->lambda_l1 = lambda1;
     network_spiral->layers[0]->lambda_l2 = lambda2;
 
-    network_spiral->layers[1]->lambda_l1 = lambda1;
-    network_spiral->layers[1]->lambda_l2 = lambda2;
+    // network_spiral->layers[1]->lambda_l1 = lambda1;
+    // network_spiral->layers[1]->lambda_l2 = lambda2;
 
     // network_spiral->layers[2]->lambda_l1 = lambda1;
     // network_spiral->layers[2]->lambda_l2 = lambda2;
@@ -123,10 +123,10 @@ int main(int argc, char** argv) {
 
 
     // Free memory
-    // free_neural_network(network_spiral);
+    free_neural_network(network_spiral);
     
-
     free(spiral_pred.data);
     free(spiral_train.data);
-
+    free(spiral_test.data);
+    free(spiral_test_pred.data);
 }

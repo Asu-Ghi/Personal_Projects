@@ -17,7 +17,7 @@ SRC_FILES="src/main.c src/network.c src/layer_dense.c src/utils.c"
 INCLUDE_DIR="include/"
 BUILD_DIR="build/"
 OUTPUT_FILE="${BUILD_DIR}main"
-CFLAGS="-O3 -march=native -funroll-loops -ftree-vectorize -I ${INCLUDE_DIR}"
+CFLAGS="-O3 -march=native -funroll-loops -lm -ftree-vectorize -I ${INCLUDE_DIR}"
 PARALLEL_FLAG=""
 DIAGNOSTIC_FLAG=""
 

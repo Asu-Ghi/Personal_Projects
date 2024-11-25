@@ -102,17 +102,19 @@ int cols_output = layer->post_activation_output->dim2;
 }
 
 layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activation, OptimizationType optimization) {
-
+    
     // initialize a layer dense object
     layer_dense* layer_ = malloc(sizeof(layer_dense));
     layer_->num_inputs = num_inputs;
     layer_->num_neurons = num_neurons;
 
-    // point memory to null for vars that are instantiated in forwards
+    // point memory to null for vars that are instantiated in forwards and backwards
     layer_->inputs = NULL;
     layer_->dinputs = NULL;
     layer_->pre_activation_output = NULL;
     layer_->post_activation_output = NULL;
+    layer_->dweights = NULL;
+    layer_->dbiases = NULL;
 
     // point memory to null for pred inputs
     layer_->pred_inputs = NULL;
@@ -163,19 +165,6 @@ layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activati
         // layer_->weights->data[i] = sqrt(1.0 / (num_inputs + num_neurons)) * ((double)rand() / RAND_MAX * 2.0 - 1.0);
 
     }
-
-    // initialize other matrix objects, also allocate memory
-    // derivative of weights
-    layer_->dweights = (matrix*) malloc(sizeof(matrix));
-    layer_->dweights->data = (double*) calloc(num_inputs * num_neurons, sizeof(double));
-    layer_->dweights->dim1 = num_inputs;
-    layer_->dweights->dim2 = num_neurons;
-
-    // derivative of biases
-    layer_->dbiases = (matrix*) malloc(sizeof(matrix));
-    layer_->dbiases->data = (double*) calloc(num_neurons, sizeof(double));
-    layer_->dbiases->dim1 = 1;
-    layer_->dbiases->dim2 = num_neurons;
 
     // initialize activation function for the layer
     layer_->activation = activation;
@@ -247,14 +236,14 @@ layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activati
     }
 
     // Check dimensions
-    if (layer_->cache_weights->dim1 != layer_->dweights->dim1 || layer_->cache_weights->dim2 != layer_->dweights->dim2) {
+    if (layer_->cache_weights->dim1 != layer_->num_inputs || layer_->cache_weights->dim2 != layer_->num_neurons) {
         fprintf(stderr, "Error: Dimensionality mismatch between cache weights and dweights in update params adagrad.\n");
         free_layer(layer_);
         exit(1);
     }
 
     // Check dimensions
-    if (layer_->cache_bias->dim1 != layer_->dbiases->dim1 || layer_->cache_bias->dim2 != layer_->dbiases->dim2) {
+    if (layer_->cache_bias->dim1 != 1|| layer_->cache_bias->dim2 != layer_->num_neurons) {
         fprintf(stderr, "Error: Dimensionality mismatch between cache bias and dbiases in update params adagrad.\n");
         free(layer_->cache_bias->data);
         free(layer_->cache_bias);
@@ -266,53 +255,108 @@ layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activati
 }
 
 void free_layer(layer_dense* layer) {
+    // Free weights
     free(layer->weights->data);
     free(layer->weights);
+    layer->weights = NULL;
+
+    // Free biases
     free(layer->biases->data);
     free(layer->biases);
-    free(layer->dweights->data);
-    free(layer->dweights);
-    free(layer->dbiases->data);
-    free(layer->dbiases);
+    layer->biases = NULL;
+
+    // Free dweights
+    if (layer->dweights != NULL) {
+        free(layer->dweights->data);
+        free(layer->dweights); 
+        layer->dweights = NULL; 
+    }
+
+    // Free dbiases
+    if (layer->dbiases != NULL) {
+        free(layer->dbiases->data);
+        free(layer->dbiases);     
+        layer->dbiases = NULL;
+    }
+
     // If inputs != NULL so do these other variables
     if (layer->inputs != NULL) {
         free(layer->inputs->data);
         free(layer->inputs);
+        layer->inputs = NULL;
+    }
+    if (layer->dinputs != NULL) {
         free(layer->dinputs->data);
         free(layer->dinputs);
+        layer->dinputs = NULL;
+    }
+    if (layer->pre_activation_output != NULL) {
         free(layer->pre_activation_output->data);
         free(layer->pre_activation_output);
+        layer->pre_activation_output = NULL;
+    }
+    if (layer->post_activation_output != NULL) {
         free(layer->post_activation_output->data);
         free(layer->post_activation_output);    
+        layer->post_activation_output = NULL;
     }
+
     free(layer->w_velocity->data);
     free(layer->w_velocity);
+    layer->w_velocity = NULL;
+
     free(layer->b_velocity->data);
     free(layer->b_velocity);
+    layer->b_velocity = NULL;
+  
     free(layer->cache_weights->data);
     free(layer->cache_weights);
+    layer->cache_weights = NULL;
+  
     free(layer->cache_bias->data);
     free(layer->cache_bias);
+    layer->cache_bias = NULL;
+
     free(layer);
     layer = NULL;
 }
 
 void free_memory(layer_dense* layer) {
-    free(layer->inputs->data);
-    free(layer->inputs);
-    layer->inputs = NULL;
+    
+    // Free dweights
+    if (layer->dweights != NULL) {
+        free(layer->dweights->data);
+        free(layer->dweights); 
+        layer->dweights = NULL; 
+    }
+    // Free dbiases
+    if (layer->dbiases != NULL) {
+        free(layer->dbiases->data);
+        free(layer->dbiases);     
+        layer->dbiases = NULL;
+    }
 
-    free(layer->dinputs->data);
-    free(layer->dinputs);
-    layer->dinputs = NULL;
-
-    free(layer->pre_activation_output->data);
-    free(layer->pre_activation_output);
-    layer->pre_activation_output = NULL;
-
-    free(layer->post_activation_output->data);
-    free(layer->post_activation_output);
-    layer->post_activation_output = NULL;
+    // If inputs != NULL so do these other variables
+    if (layer->inputs != NULL) {
+        free(layer->inputs->data);
+        free(layer->inputs);
+        layer->inputs = NULL;
+    }
+    if (layer->dinputs != NULL) {
+        free(layer->dinputs->data);
+        free(layer->dinputs);
+        layer->dinputs = NULL;
+    }
+    if (layer->pre_activation_output != NULL) {
+        free(layer->pre_activation_output->data);
+        free(layer->pre_activation_output);
+        layer->pre_activation_output = NULL;
+    }
+    if (layer->post_activation_output != NULL) {
+        free(layer->post_activation_output->data);
+        free(layer->post_activation_output);    
+        layer->post_activation_output = NULL;
+    }
 
     // if pred inputs != null, so does pred outputs
     if (layer->pred_inputs != NULL) {
@@ -324,6 +368,14 @@ void free_memory(layer_dense* layer) {
         free(layer->pred_outputs);
         layer->pred_outputs = NULL;
     }
+
+    // Free binary mask for dropout
+    if (layer->binary_mask != NULL) {
+        free(layer->binary_mask->data);
+        free(layer->binary_mask);
+        layer->binary_mask = NULL;
+    }
+
 }
 //////////////////////////////////////////////////// ACCURACY METHODS ///////////////////////////////////////////////////////////////////////////
 
@@ -723,7 +775,7 @@ double calculate_regularization_loss(layer_dense* layer) {
 void forward_pass(matrix* inputs, layer_dense* layer) {
 
      // Allocate memory for layer input and dinput data
-    if(layer->inputs == NULL) {
+    if (layer->inputs == NULL) {
         layer->inputs = malloc(sizeof(matrix));
         layer->inputs->dim1 = inputs->dim1;
         layer->inputs->dim2 = inputs->dim2;
@@ -779,7 +831,7 @@ void forward_pass(matrix* inputs, layer_dense* layer) {
 
     // Add biases for the layer to the batch output data
     // batch_size x num_neurons, where output dim1 -> batch size
-
+    #pragma omp for collapse(2) schedule(static)
     for (int i = 0; i < layer->pre_activation_output->dim1; i++) {
         // output dim2-> num neurons
         for (int j = 0; j < layer->pre_activation_output->dim2; j++) {
@@ -863,12 +915,17 @@ void pred_forward_pass(matrix* inputs, layer_dense* layer) {
     matrix* z = matrix_mult(inputs, layer->weights);
 
     // Add biases
-    // #pragma omp for collapse(2) schedule(dynamic) // Paralellize it (schedule dynamic helps allocate resources)
+    #pragma omp for collapse(2) schedule(static) 
     for (int i = 0; i < layer->pred_outputs->dim1; i++) {
         for (int j = 0; j < layer->pred_outputs->dim2; j++) {
             layer->pred_outputs->data[i * layer->pred_outputs->dim2 + j] = z->data[i * layer->pred_outputs->dim2 + j] + layer->biases->data[j];
         }
     }
+
+    // Free Z
+    free(z->data);
+    free(z);
+    z = NULL;
 
     // Apply Activation
     
@@ -1096,6 +1153,29 @@ void backward_reLu(matrix* input_gradients, layer_dense* layer) {
         > Pass Gradients for INPUTS to the layer previous.
     */
 
+    // Allocate memory for dweights and dbiases if not already done
+    if (layer->dweights == NULL) {
+        layer->dweights = (matrix*) malloc(sizeof(matrix));
+        layer->dweights->data = (double*) calloc(layer->num_inputs * layer->num_neurons, sizeof(double));
+        layer->dweights->dim1 = layer->num_inputs;
+        layer->dweights->dim2 = layer->num_neurons;
+        if (layer->dweights->data == NULL) {
+            fprintf(stderr, "Error: Memory allocation for dweights failed in backward relu\n");
+            exit(1);
+        }      
+    }
+
+    if (layer->dbiases == NULL) {
+        layer->dbiases = (matrix*) malloc(sizeof(matrix));
+        layer->dbiases->data = (double*) calloc(layer->num_neurons, sizeof(double));
+        layer->dbiases->dim1 = 1;
+        layer->dbiases->dim2 = layer->num_neurons;
+        if (layer->dbiases->data == NULL) {
+            fprintf(stderr, "Error: Memory allocation for dbiases failed in backward relu\n");
+            exit(1);
+        }        
+    }
+
     // Allocate memory for ReLU gradient
     matrix* relu_gradients = malloc(sizeof(matrix));
     relu_gradients->dim1 = layer->pre_activation_output->dim1;
@@ -1110,7 +1190,7 @@ void backward_reLu(matrix* input_gradients, layer_dense* layer) {
 
     // If using dropout, apply
     if (layer->drop_out_rate > 0.0) {
-        apply_dropout_gradients(relu_gradients, layer);
+        apply_dropout_gradients(relu_gradients, layer); // supports parallel
     }
 
     // Iterate through every value in layer post activation output to get relu gradients
@@ -1154,6 +1234,11 @@ void backward_reLu(matrix* input_gradients, layer_dense* layer) {
     // Perform the dot product
     layer->dweights = matrix_mult(inputs_transposed, relu_and_input_grads); // supports parallel
 
+    // Free inputs transposed
+    free(inputs_transposed->data);
+    free(inputs_transposed);
+    inputs_transposed = NULL;
+
     // If clipping gradients, apply
     if (layer->clip_value > 0) {
         clip_gradients(layer->dweights, layer->clip_value); // supports parallel
@@ -1180,17 +1265,16 @@ void backward_reLu(matrix* input_gradients, layer_dense* layer) {
     // Check dimensions
     if (relu_and_input_grads->dim2 != weights_transposed->dim1) {
         fprintf(stderr, "Error: Dimensionality mismatch between relu gradients and weights transposed in backwards RELU\n");
-        free(weights_transposed->data);
-        free(weights_transposed);
-        free(relu_and_input_grads->data);
-        free(relu_and_input_grads);
-        free(inputs_transposed->data);
-        free(inputs_transposed);
         exit(1);
     }
 
     // Dot product of relu_gradients and weights transposed
     layer->dinputs = matrix_mult(relu_and_input_grads, weights_transposed); // supports parallel
+
+    // Free weights transpoes
+    free(weights_transposed->data);
+    free(weights_transposed);
+    weights_transposed = NULL;
 
     // If clipping gradients, apply
     if (layer->clip_value > 0) {
@@ -1200,41 +1284,22 @@ void backward_reLu(matrix* input_gradients, layer_dense* layer) {
     // Final dimensionality check
     if (layer->weights->dim1 != layer->dweights->dim1 || layer->weights->dim2 != layer->dweights->dim2) {
         fprintf(stderr, "Error. Dimensionality mismatch between dweights and weights in backwards ReLu.\n");
-        free(weights_transposed->data);
-        free(weights_transposed);
-        free(relu_and_input_grads->data);
-        free(relu_and_input_grads);
-        free(inputs_transposed->data);
-        free(inputs_transposed);
+        exit(1);
     }
 
     if (layer->biases->dim1 != layer->dbiases->dim1 || layer->biases->dim2 != layer->dbiases->dim2) {
         fprintf(stderr, "Error. Dimensionality mismatch between dbiases and biases in backwards ReLu.\n");
-        free(weights_transposed->data);
-        free(weights_transposed);
-        free(relu_and_input_grads->data);
-        free(relu_and_input_grads);
-        free(inputs_transposed->data);
-        free(inputs_transposed);
+        exit(1);
     }
 
     if (layer->inputs->dim1 != layer->dinputs->dim1 || layer->inputs->dim2 != layer->dinputs->dim2) {
         fprintf(stderr, "Error. Dimensionality mismatch between dinputs and inputs in backwards ReLu.\n");
-        free(weights_transposed->data);
-        free(weights_transposed);
-        free(relu_and_input_grads->data);
-        free(relu_and_input_grads);
-        free(inputs_transposed->data);
-        free(inputs_transposed);
+        exit(1);
     }
 
     // free unused memory
-    free(weights_transposed->data);
-    free(weights_transposed);
     free(relu_and_input_grads->data);
     free(relu_and_input_grads);
-    free(inputs_transposed->data);
-    free(inputs_transposed);
 
 }
 
@@ -1245,6 +1310,29 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
         printf("Inputs:(%d x %d) != True:(%d x %d)\n", layer->post_activation_output->dim1, layer->post_activation_output->dim2, 
         true_labels->dim1, true_labels->dim2);
         exit(1);
+    }
+
+    // Allocate memory for dweights and dbiases if not already done
+    if (layer->dweights == NULL) {
+        layer->dweights = (matrix*) malloc(sizeof(matrix));
+        layer->dweights->data = (double*) calloc(layer->num_inputs * layer->num_neurons, sizeof(double));
+        layer->dweights->dim1 = layer->num_inputs;
+        layer->dweights->dim2 = layer->num_neurons;
+        if (layer->dweights->data == NULL) {
+            fprintf(stderr, "Error: Memory allocation for dweights failed in backward softmax\n");
+            exit(1);
+        }      
+    }
+
+    if (layer->dbiases == NULL) {
+        layer->dbiases = (matrix*) malloc(sizeof(matrix));
+        layer->dbiases->data = (double*) calloc(layer->num_neurons, sizeof(double));
+        layer->dbiases->dim1 = 1;
+        layer->dbiases->dim2 = layer->num_neurons;
+        if (layer->dbiases->data == NULL) {
+            fprintf(stderr, "Error: Memory allocation for dbiases failed in backward softmax\n");
+            exit(1);
+        }        
     }
 
     // Calculate softmax loss partial derivatives
@@ -1290,6 +1378,11 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
     // Calculate dweights -> dont need to allocate memory as matrix_mult does that.
     layer->dweights = matrix_mult(inputs_T, loss_gradients); // supports parallel
 
+    // Free inputs transposed
+    free(inputs_T->data);
+    free(inputs_T);
+    inputs_T = NULL;
+
     // If clipping gradients, apply
     if (layer->clip_value > 0) {
         clip_gradients(layer->dweights, layer->clip_value); //supports parallel
@@ -1300,9 +1393,6 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
     // Check memory allocation
     if (layer->dbiases->data == NULL) {
         fprintf(stderr, "Error in memory allocation for dbiases in softmax backprop. \n");
-        free(loss_gradients->data);
-        free(loss_gradients);
-        free(inputs_T->data);
         exit(1);    
     }
 
@@ -1329,18 +1419,17 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
     // Check dimensions
     if(loss_gradients->dim2 != weights_transposed->dim1) {
         fprintf(stderr, "Error: Dimensionality mismatch for weights transposed in backprop softmax function.\n");
-        free(loss_gradients->data);
-        free(loss_gradients);
-        free(inputs_T->data);
-        free(layer->dbiases->data);
-        free(layer->dbiases);
-        free(layer->dweights->data);
-        free(layer->dweights);
         exit(1);    
     }
 
     // Calculate backprop derivative to pass to layer previous
     layer->dinputs = matrix_mult(loss_gradients, weights_transposed); // supports parallel
+
+
+    // Free weights transposed
+    free(weights_transposed->data);
+    free(weights_transposed);
+    weights_transposed = NULL;
 
     // If clipping gradients, apply
     if (layer->clip_value > 0) {
@@ -1350,31 +1439,20 @@ void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer) {
     // Final dimensionality check
     if (layer->weights->dim1 != layer->dweights->dim1 || layer->weights->dim2 != layer->dweights->dim2) {
         fprintf(stderr, "Error. Dimensionality mismatch between dweights and weights in backwards ReLu.\n");
-        free(weights_transposed->data);
-        free(weights_transposed);
-        free(loss_gradients->data);
-        free(loss_gradients);
+        exit(1);
     }
 
     if (layer->biases->dim1 != layer->dbiases->dim1 || layer->biases->dim2 != layer->dbiases->dim2) {
         fprintf(stderr, "Error. Dimensionality mismatch between dbiases and biases in backwards ReLu.\n");
-        free(weights_transposed->data);
-        free(weights_transposed);
-        free(loss_gradients->data);
-        free(loss_gradients);
+        exit(1);
     }
 
     if (layer->inputs->dim1 != layer->dinputs->dim1 || layer->inputs->dim2 != layer->dinputs->dim2) {
         fprintf(stderr, "Error. Dimensionality mismatch between dinputs and inputs in backwards ReLu.\n");
-        free(weights_transposed->data);
-        free(weights_transposed);
-        free(loss_gradients->data);
-        free(loss_gradients);
+        exit(1);
     }
 
     // free unused memory
-    free(weights_transposed->data);
-    free(weights_transposed);
     free(loss_gradients->data);
     free(loss_gradients);
 }
