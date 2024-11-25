@@ -127,6 +127,11 @@ libnn.free_neural_network.argtypes = [
 ]
 libnn.free_neural_network.restype = None # Returns Void
 
+# Free uneeded memory after forward and backward pass
+libnn.free_layers_memory.argtypes = [
+    ctypes.POINTER(NeuralNetwork) # Network
+]
+libnn.free_layers_memory.restype = None # Returns Void
 
 # Print Neural Net Info
 libnn.print_nn_info.argtypes = [
@@ -255,7 +260,7 @@ libnn.loss_categorical_cross_entropy.argtypes = [
     ctypes.POINTER(LayerDense), # Final Dense Layer
     ClassLabelEncoding # Lable encoding
 ]
-libnn.loss_categorical_cross_entropy.restype = matrix # Retuns matrix
+libnn.loss_categorical_cross_entropy.restype = ctypes.POINTER(matrix) # Retuns pointer to matrix
 
 
 # Dense Layer Predictions Loss (Categorical Cross Entropy) 
@@ -264,7 +269,7 @@ libnn.pred_loss_categorical_cross_entropy.argtypes = [
     ctypes.POINTER(LayerDense), # Final Dense Layer
     ClassLabelEncoding # Lable encoding
 ]
-libnn.pred_loss_categorical_cross_entropy.restype = matrix # Retuns matrix
+libnn.pred_loss_categorical_cross_entropy.restype = ctypes.POINTER(matrix) # Retuns pointer to matrix
 
 
 # Dense Layer Calculate Regularization Loss 
