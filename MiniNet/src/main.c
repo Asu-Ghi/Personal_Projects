@@ -40,11 +40,11 @@ int main(int argc, char** argv) {
     spiral_pred.data = (double*) calloc(spiral_pred.dim1 * spiral_pred.dim2, sizeof(double));
 
     // Init validating
-    spiral_test.dim1 = 100;
+    spiral_test.dim1 = 300;
     spiral_test.dim2 = 2;
     spiral_test.data = (double*) calloc(spiral_test.dim1 * spiral_test.dim2, sizeof(double));
 
-    spiral_test_pred.dim1 = 100;
+    spiral_test_pred.dim1 = 300;
     spiral_test_pred.dim2 = 3;
     spiral_test_pred.data = (double*) calloc(spiral_test_pred.dim1 * spiral_test_pred.dim2, sizeof(double));
 
@@ -56,8 +56,8 @@ int main(int argc, char** argv) {
     load_data("data/Spiral/train_labels_1000.csv", spiral_pred.data, 0, 1000, 3);
 
     // Load validating
-    load_data("data/Spiral/test_data.csv", spiral_test.data, 0, 100, 2);
-    load_data("data/Spiral/test_labels.csv", spiral_test_pred.data, 0, 100, 3);
+    load_data("data/Spiral/test_data.csv", spiral_test.data, 0, 300, 2);
+    load_data("data/Spiral/test_labels.csv", spiral_test_pred.data, 0, 300, 3);
 
     int spiral_num_features = 2;
     int spiral_neurons_in_layer[2] = {512, 3}; // Num neurons in a layer
@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
     int max_lr = 1;
     double lr_factor = 1.01;
     double epsilon = 1e-7;
-    double beta_1 = 0.85; // Momentums
+    double beta_1 = 0.9; // Momentums
     double beta_2 = 0.9; // RMS PROP CACHE
     double lambda1 = 5e-4;
     double lambda2 = 5e-4;

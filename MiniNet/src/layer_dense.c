@@ -297,6 +297,34 @@ void free_layer(layer_dense* layer) {
     layer = NULL;
 }
 
+void free_memory(layer_dense* layer) {
+    free(layer->inputs->data);
+    free(layer->inputs);
+    layer->inputs = NULL;
+
+    free(layer->dinputs->data);
+    free(layer->dinputs);
+    layer->dinputs = NULL;
+
+    free(layer->pre_activation_output->data);
+    free(layer->pre_activation_output);
+    layer->pre_activation_output = NULL;
+
+    free(layer->post_activation_output->data);
+    free(layer->post_activation_output);
+    layer->post_activation_output = NULL;
+
+    // if pred inputs != null, so does pred outputs
+    if (layer->pred_inputs != NULL) {
+        free(layer->pred_inputs->data);
+        free(layer->pred_inputs);
+        layer->pred_inputs = NULL;
+
+        free(layer->pred_outputs->data);
+        free(layer->pred_outputs);
+        layer->pred_outputs = NULL;
+    }
+}
 //////////////////////////////////////////////////// ACCURACY METHODS ///////////////////////////////////////////////////////////////////////////
 
 double calculate_accuracy(matrix* class_targets, layer_dense* final_layer, ClassLabelEncoding encoding) {
@@ -672,6 +700,7 @@ double calculate_regularization_loss(layer_dense* layer) {
         l1_w += fabs(layer->weights->data[i]);
         l2_w += layer->weights->data[i] * layer->weights->data[i];
     }
+
 
     // Bias regularization L1 and L2
     for (int i = 0; i <layer->biases->dim1 * layer->biases->dim2; i++) {
@@ -1058,8 +1087,13 @@ matrix* forward_sigmoid(matrix* inputs) {
 void backward_reLu(matrix* input_gradients, layer_dense* layer) {
     /*
     Find Gradient of the ReLu of the layer.
-    STEP 1: Find Gradient of ReLu based off of pre activation output of the layer (ie. data that hasnt had ReLU applied yet.)
-    STEP 2: Perform an element by element multiplication of the input gradients from the layer before to the gradients found in step 1.
+    STEPS:
+        > Gradients for DROPOUT
+        > Gradients for ACTIVATION
+        > Gradients for WEIGHTS
+        > Gradients for BIASES
+        > Gradients for INPUTS
+        > Pass Gradients for INPUTS to the layer previous.
     */
 
     // Allocate memory for ReLU gradient
@@ -1733,7 +1767,7 @@ void update_params_rmsprop(layer_dense* layer, double* learning_rate, double dec
 }
 
 void update_params_adam (layer_dense* layer, double* learning_rate, double decay_rate, double beta_1, 
-                double beta_2, double epsilon, int t, bool correctBias) {
+                double beta_2, double epsilon, int current_epoch, int total_epochs, bool correctBias) {
     
     // Check memory allocation for momentums and cache
     if (layer->w_velocity->data == NULL || layer->b_velocity->data == NULL) {
@@ -1769,7 +1803,7 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
 
     // Apply learning rate decay (if decay factor is specified)
     if (decay_rate > 0.0) {
-        *learning_rate = *learning_rate / (1 + decay_rate * t / 10);
+        *learning_rate = *learning_rate / (1 + decay_rate * current_epoch / total_epochs);
     }
     float min_learning_rate = 1e-6;
     *learning_rate = fmax(*learning_rate, min_learning_rate);
@@ -1787,7 +1821,7 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
         // Correct Momentum
         if (correctBias) {
             double log_beta_1 = log(beta_1);
-            layer->w_velocity->data[i] = layer->w_velocity->data[i] / (1.0 - exp((t + 1) * log_beta_1)); // Bias correction for weights momentum
+            layer->w_velocity->data[i] = layer->w_velocity->data[i] / (1.0 - exp((current_epoch + 1) * log_beta_1)); // Bias correction for weights momentum
         }
 
         // Update cache 
@@ -1796,7 +1830,7 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
         // Correct cache
         if (correctBias) {
             double log_beta_2 = log(beta_2);
-            layer->cache_weights->data[i] = layer->cache_weights->data[i] / (1.0 - exp((t + 1) * log_beta_2)); // Bias correction for weight cache
+            layer->cache_weights->data[i] = layer->cache_weights->data[i] / (1.0 - exp((current_epoch + 1) * log_beta_2)); // Bias correction for weight cache
         }
 
         // Update Weights using corrected moments and cache
@@ -1813,7 +1847,7 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
         // Correct Momentum
         if (correctBias) {
             double log_beta_1 = log(beta_1);
-            layer->b_velocity->data[i] = layer->b_velocity->data[i] / (1.0 - exp((t + 1) * log_beta_1)); // Bias correction for bias momentum
+            layer->b_velocity->data[i] = layer->b_velocity->data[i] / (1.0 - exp((current_epoch + 1) * log_beta_1)); // Bias correction for bias momentum
         }
         
         // Update cache 
@@ -1822,7 +1856,7 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
         // Correct cache
         if (correctBias) {
             double log_beta_2 = log(beta_2);
-            layer->cache_bias->data[i] = layer->cache_bias->data[i] / (1.0 - exp((t + 1) * log_beta_2)); // Bias correction for bias cache
+            layer->cache_bias->data[i] = layer->cache_bias->data[i] / (1.0 - exp((current_epoch + 1) * log_beta_2)); // Bias correction for bias cache
         }
 
         // Update Bias using corrected moments and cache
@@ -1840,7 +1874,7 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
         // Correct Momentum
         if (correctBias) {
             double log_beta_1 = log(beta_1);
-            layer->w_velocity->data[i] = layer->w_velocity->data[i] / (1.0 - exp((t + 1) * log_beta_1)); // Bias correction for weights momentum
+            layer->w_velocity->data[i] = layer->w_velocity->data[i] / (1.0 - exp((current_epoch + 1) * log_beta_1)); // Bias correction for weights momentum
         }
 
         // Update cache 
@@ -1849,7 +1883,7 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
         // Correct cache
         if (correctBias) {
             double log_beta_2 = log(beta_2);
-            layer->cache_weights->data[i] = layer->cache_weights->data[i] / (1.0 - exp((t + 1) * log_beta_2)); // Bias correction for weight cache
+            layer->cache_weights->data[i] = layer->cache_weights->data[i] / (1.0 - exp((current_epoch + 1) * log_beta_2)); // Bias correction for weight cache
         }
 
         // Update Weights using corrected moments and cache
@@ -1865,7 +1899,7 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
         // Correct Momentum
         if (correctBias) {
             double log_beta_1 = log(beta_1);
-            layer->b_velocity->data[i] = layer->b_velocity->data[i] / (1.0 - exp((t + 1) * log_beta_1)); // Bias correction for bias momentum
+            layer->b_velocity->data[i] = layer->b_velocity->data[i] / (1.0 - exp((current_epoch + 1) * log_beta_1)); // Bias correction for bias momentum
         }
         
         // Update cache 
@@ -1874,7 +1908,7 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
         // Correct cache
         if (correctBias) {
             double log_beta_2 = log(beta_2);
-            layer->cache_bias->data[i] = layer->cache_bias->data[i] / (1.0 - exp((t + 1) * log_beta_2)); // Bias correction for bias cache
+            layer->cache_bias->data[i] = layer->cache_bias->data[i] / (1.0 - exp((current_epoch + 1) * log_beta_2)); // Bias correction for bias cache
         }
 
         // Update Bias using corrected moments and cache
@@ -1884,7 +1918,7 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
 #endif 
 }
 
-void optimization_dense(layer_dense* layer, double* lr, double lr_decay, int current_epoch, double beta1, double beta2,
+void optimization_dense(layer_dense* layer, double* lr, double lr_decay, int current_epoch, int total_epochs, double beta1, double beta2,
                         double epsilon, bool useBiasCorrection) {
     if (layer->optimization == SGD){
         update_params_sgd(layer, lr, current_epoch, lr_decay);
@@ -1902,7 +1936,7 @@ void optimization_dense(layer_dense* layer, double* lr, double lr_decay, int cur
     }
 
     else if (layer->optimization == ADAM) {
-        update_params_adam(layer, lr, lr_decay, beta1, beta2, epsilon, current_epoch, useBiasCorrection);
+        update_params_adam(layer, lr, lr_decay, beta1, beta2, epsilon, current_epoch, total_epochs, useBiasCorrection);
     }
 
     // Free memory after optimization

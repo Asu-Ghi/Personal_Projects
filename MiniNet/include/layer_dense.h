@@ -67,9 +67,14 @@ Returns a layer dense object. Allocates memory on the heap for the object and it
 layer_dense* init_layer(int num_inputs, int num_neurons, ActivationType activation, OptimizationType optimization);
 
 /*
-Frees layer dense memory.
+Frees all layer dense memory.
 */
 void free_layer(layer_dense* layer);
+
+/*
+Free uneeded memory after forward and backward pass.
+*/
+void free_memory(layer_dense* layer);
 
 //////////////////////////////////////////////////// ACCURACY METHODS ///////////////////////////////////////////////////////////////////////////
 
@@ -214,13 +219,12 @@ For Batch Gradient Descent t = current epoch
 For Mini Batch Gradient Descent t is incriminted after every mini batch.
 Beta_1 and Beta_2 are hyperparameters affecting momentum and RMSProp caches respectively. 
 */
-void update_params_adam (layer_dense* layer, double* learning_rate, double decay_rate, 
-                    double beta_1, double beta_2, double epsilon, int t, bool correctBias);
-
+void update_params_adam (layer_dense* layer, double* learning_rate, double decay_rate, double beta_1, 
+                double beta_2, double epsilon, int current_epoch, int total_epochs, bool correctBias);
 
 
 /*
 Call optimization for dense
 */
-void optimization_dense(layer_dense* layer, double* lr, double lr_decay, int current_epoch, double beta1, double beta2,
+void optimization_dense(layer_dense* layer, double* lr, double lr_decay, int current_epoch, int total_epochs, double beta1, double beta2,
                         double epsilon, bool useBiasCorrection);

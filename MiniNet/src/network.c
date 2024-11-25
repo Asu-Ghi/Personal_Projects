@@ -13,12 +13,12 @@ NeuralNetwork* init_neural_network(int num_layers, int* num_neurons_in_layer, do
     n_network->num_features = num_batch_features;
     n_network->learning_rate = learning_rate;
     n_network->decay_rate = 0.0; 
-    n_network->num_epochs = 150; // by default
+    n_network->num_epochs = 0; // by default
     n_network->activations_per_layer = activations; 
     n_network->optimizations_per_layer = optimizations;
     n_network->regularizations_per_layer = regularizations;
     n_network->num_neurons_in_layer = num_neurons_in_layer;
-    n_network->current_epoch = 100; 
+    n_network->current_epoch = 0; 
     n_network->momentum = false; 
     n_network->beta_1 = 0.90; // initializes to 0.9 -> Used for Momentum
     n_network->beta_2 = 0.999; // initializes to 0.999 -> Used for Cachce
@@ -73,6 +73,12 @@ void free_neural_network(NeuralNetwork* network) {
     free(network->drop_out_per_layer);
     free(network);
     network = NULL;
+}
+
+void free_layers_memory(NeuralNetwork* network) {
+    for (int i = 0; i < network->num_layers; i++) {
+        free_memory(network->layers[i]);
+    }
 }
 
 void print_nn_info(NeuralNetwork* network) {
@@ -178,7 +184,7 @@ void update_parameters(NeuralNetwork* network) {
     // Loop through the first and all hidden layers
     for (int i = 0; i < network->num_layers; i++) {
         // Optimize layer
-        optimization_dense(network->layers[i], &network->learning_rate, network->decay_rate, network->current_epoch,
+        optimization_dense(network->layers[i], &network->learning_rate, network->decay_rate, network->current_epoch, network->num_epochs,
                             network->beta_1, network->beta_2, network->epsilon, network->useBiasCorrection);
     }   
 }
@@ -199,6 +205,8 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
     }
     // calculate batch loss
     double batch_loss = 0.0;
+    // calc regularization loss
+    double regularization_loss = 0.0;
     // calculate accuracy
     double accuracy = 0.0;
     // validate loss and accuracy
@@ -220,6 +228,8 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
         batch_loss = 0.0;
         // reset accuracy
         accuracy = 0.0;
+        // reset regularization loss
+        regularization_loss = 0.0;
 
         // Step 1: Forward Pass
         #ifdef ENABLE_PARALLEL
@@ -265,9 +275,8 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
         double regularization_start_time = omp_get_wtime();
         #endif
 
-        double regularization_val = 0.0;
         for (int i = 0; i < network->num_layers; i++) {
-            regularization_val += calculate_regularization_loss(network->layers[i]);
+            regularization_loss += calculate_regularization_loss(network->layers[i]);
         } 
 
         #ifdef ENABLE_PARALLEL
@@ -276,7 +285,7 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
         #endif
 
         // Sum regularization to loss
-        batch_loss += regularization_val;
+        batch_loss += regularization_loss;
 
         // Add loss to the loss history
         network->loss_history[epoch] = batch_loss;
@@ -326,19 +335,23 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
             double validate_end_time = omp_get_wtime();
             validate_time += (validate_end_time - validate_start_time);
             #endif
-
         }
+
         
         // Print training data (if debug = TRUE)
         if (network->debug) {
-            printf("Epoch %d: Model Loss = %f, Regularization Loss = %f, Model Accuracy = %f, LR = %f \n", epoch, batch_loss, 
-                                regularization_val, accuracy, network->learning_rate);
+            printf("Epoch %d: Total Model Loss = %f, Regularization Loss = %f, Model Accuracy = %f, LR = %f \n", epoch, batch_loss, 
+                                regularization_loss, accuracy, network->learning_rate);
             printf("Validate Loss = %f, Validate Accuracy = %f\n", val_loss, val_accuracy);
         }
 
         // Free temp memory
         free(example_losses->data);
         free(example_losses);
+
+        // Free undeeded memory in layers
+        free_layers_memory(network);
+
     }
     // Print Final Accuracy
     printf("Epoch %d: Loss = %f, Accuracy = %f, LR = %f \n", network->current_epoch, batch_loss, accuracy, network->learning_rate);

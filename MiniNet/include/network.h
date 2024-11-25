@@ -27,6 +27,7 @@ typedef struct {
     int num_epochs;  // Total number of epochs
     int current_epoch; // Current epoch iteration
     double* loss_history; // History over batch losses
+    double* accuracy_history; // History of accuracy over training
     bool momentum; // Momentum flag
     double beta_1; // Momentum Hyperparameter
     double beta_2; // Cache Hyperparameter
@@ -49,6 +50,11 @@ NeuralNetwork* init_neural_network(int num_layers, int* num_neurons_in_layer, do
 Frees neural network from memory
 */
 void free_neural_network(NeuralNetwork* network);
+
+/*
+Frees uneeded memory from every layer in the network after a forward and backward pass.
+*/
+void free_layers_memory(NeuralNetwork* network);
 
 /*
 Prints information for the neural net.
