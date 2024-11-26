@@ -223,92 +223,52 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
         regularization_loss = 0.0;
 
         // Step 1: Forward Pass
-        #ifdef ENABLE_PARALLEL
         double forward_start_time = omp_get_wtime();
-        #endif
         forward_pass_nn(network, X);
-
-        #ifdef ENABLE_PARALLEL
         double forward_end_time = omp_get_wtime();
         forward_time += (forward_end_time - forward_start_time);
-        #endif
 
         // Step 2: Calculate Loss and Accuracy
-        #ifdef ENABLE_PARALLEL
         double accuracy_start_time = omp_get_wtime();
-        #endif
-
         accuracy = calculate_accuracy(Y, network->layers[network->num_layers-1], ONE_HOT);
-
-        #ifdef ENABLE_PARALLEL
         double accuracy_end_time = omp_get_wtime();
         accuracy_time += (accuracy_end_time - accuracy_start_time);
-        #endif
+    
 
-        #ifdef ENABLE_PARALLEL
         double loss_start_time = omp_get_wtime();
-        #endif
         matrix* example_losses = loss_categorical_cross_entropy(Y, network->layers[network->num_layers-1], ONE_HOT);
-
-
         for (int i = 0; i < Y->dim1; i++) {
             batch_loss+= example_losses->data[i];
         }
         batch_loss = batch_loss/Y->dim1;
-        // Free examples losses
-        free(example_losses->data);
-        free(example_losses);
         example_losses = NULL;
-
-
-        #ifdef ENABLE_PARALLEL
         double loss_end_time = omp_get_wtime();
         loss_time += (loss_end_time - loss_start_time);
-        #endif
+
+        // Free examples losses
+        free(example_losses->data);
+        free(example_losses);       
 
         // Calculate regularization for l1 and l2 
-        #ifdef ENABLE_PARALLEL
         double regularization_start_time = omp_get_wtime();
-        #endif
-
         for (int i = 0; i < network->num_layers; i++) {
             regularization_loss += calculate_regularization_loss(network->layers[i]);
         } 
-
-        #ifdef ENABLE_PARALLEL
         double regularization_end_time = omp_get_wtime();
         regularization_time += (regularization_end_time - regularization_start_time);
-        #endif
-
-        // Sum regularization to loss
-        batch_loss += regularization_loss;
-
-        // Add loss to the loss history
-        network->loss_history[epoch] = batch_loss;
 
         // Step 3: Backward Pass
-        #ifdef ENABLE_PARALLEL
         double backward_start_time = omp_get_wtime();
-        #endif
-
         backward_pass_nn(network, Y);
-
-        #ifdef ENABLE_PARALLEL
         double backward_end_time = omp_get_wtime();
         backward_time += (backward_end_time - backward_start_time);
-        #endif
 
         // Step 4: Update Weights
 
-        #ifdef ENABLE_PARALLEL
         double optimization_start_time = omp_get_wtime();
-        #endif
         update_parameters(network);
-
-        #ifdef ENABLE_PARALLEL
         double optimization_end_time = omp_get_wtime();
         optimization_time += (optimization_end_time - optimization_start_time);
-        #endif
 
         // Step 5: Update current epoch (for learning rate decay)
         network->current_epoch += 1;
@@ -334,10 +294,16 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
         }
         // Print training data (if debug = TRUE)
         if (network->debug) {
-            printf("Epoch %d: Total Model Loss = %f, Regularization Loss = %f, Model Accuracy = %f, LR = %f \n", epoch, batch_loss, 
-                                regularization_loss, accuracy, network->learning_rate);
+            printf("Epoch %d: Loss = %f (data_loss: %f, reg_loss: %f), Accuracy = %f, LR = %f \n", network->current_epoch, batch_loss+regularization_loss,
+                        batch_loss, regularization_loss, accuracy, network->learning_rate);
             printf("Validate Loss = %f, Validate Accuracy = %f\n", val_loss, val_accuracy);
         }
+
+        // Sum regularization to loss
+        batch_loss += regularization_loss;
+
+        // Add loss to the loss history
+        network->loss_history[epoch] = batch_loss;
 
         // Free temp memory
         free(example_losses->data);
@@ -348,7 +314,8 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
 
     }
     // Print Final Accuracy
-    printf("Epoch %d: Loss = %f, Accuracy = %f, LR = %f \n", network->current_epoch, batch_loss, accuracy, network->learning_rate);
+    printf("Epoch %d: Loss = %f , Accuracy = %f, LR = %f \n", network->current_epoch, batch_loss,
+            accuracy, network->learning_rate);
     
     // Print time debugs
     #ifdef ENABLE_PARALLEL

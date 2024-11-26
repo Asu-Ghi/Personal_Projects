@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
     bool spiral_regularization_per_layer[3] = {true, true, true}; // size num layers
 
     // Find best lr
-    int num_epochs = 50;
+    int num_epochs = 1000;
     double init_lr = 0.05;
     double decay_rate = 5e-5;
     int max_lr = 1;
@@ -74,8 +74,8 @@ int main(int argc, char** argv) {
     double epsilon = 1e-7;
     double beta_1 = 0.85; // Momentums
     double beta_2 = 0.9; // RMS PROP CACHE
-    double lambda1 = 5e-4;
-    double lambda2 = 5e-4;
+    double lambda1 = 5e-6;
+    double lambda2 = 5e-6;
 
     NeuralNetwork* network_spiral = init_neural_network(3, spiral_neurons_in_layer, init_lr,
                                             spiral_activations_per_layer, spiral_optimizations_per_layer, spiral_regularization_per_layer, spiral_num_features);
