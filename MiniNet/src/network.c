@@ -329,53 +329,13 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
     #endif
 }
 
-void predict(NeuralNetwork* network, matrix* input_data) {
-    // Check if the input data dimensions match the expected input size
-    if (input_data->dim2 != network->layers[0]->num_inputs) {
-        fprintf(stderr, "Error: Input data dimension does not match network input size.\n");
-        printf("(%d x %d) != (%d x %d)\n", 
-                    input_data->dim1, input_data->dim2, network->layers[0]->num_inputs, network->layers[0]->num_neurons);
-        return;
-    }
-    // Perform a forward pass through the network for prediction    
-    forward_pass_nn(network, input_data);
-
-    // After the forward pass, output should contain the network's predictions
-    matrix* output = network->layers[network->num_layers - 1]->post_activation_output;
-
-    // Apply softmax to the output layer to interpret the logits as probabilities
-    forward_softMax(output);
-
-    // Find the index of the class with the highest probability
-    int predicted_class = -1;
-    double max_prob = output->data[0];
-    print_matrix(network->layers[network->num_layers-1]->post_activation_output);
-    matrix* outputs = network->layers[network->num_layers-1]->post_activation_output;
-
-    double max_pred = 0.0;
-    for (int i = 0; i < outputs->dim1; i++) {
-        printf("Sample = %d.\n ", i);
-        max_pred = 0.0;
-        predicted_class = -1;
-        for (int j = 0; j < outputs->dim2; j++) {
-            if (outputs->data[i * outputs->dim2 + j] > max_pred) {
-                max_pred = outputs->data[i * outputs->dim2 + j];
-                predicted_class = j;
-            }
-        }
-        printf("Predicted Class = %d, Probability = %f\n", predicted_class, max_pred);
-    }
-
-    // Print the predicted class
-
-}
-
 void validate_model(NeuralNetwork* network, matrix* validate_data, matrix* validate_pred, double* loss, double* accuracy) {
     // Perform a forward pass on validate data
+    // pred_forward_pass_nn(network, validate_data);
     pred_forward_pass_nn(network, validate_data);
-
     // Get loss
     double batch_loss = 0.0;
+    // matrix* example_losses = pred_loss_categorical_cross_entropy(validate_pred, network->layers[network->num_layers-1], ONE_HOT);
     matrix* example_losses = pred_loss_categorical_cross_entropy(validate_pred, network->layers[network->num_layers-1], ONE_HOT);
 
     // Sum all example losses
@@ -387,6 +347,7 @@ void validate_model(NeuralNetwork* network, matrix* validate_data, matrix* valid
     *loss = batch_loss / validate_data->dim1;
 
     // Get Accuracy
+    // *accuracy = pred_calculate_accuracy(validate_pred, network->layers[network->num_layers-1], ONE_HOT);
     *accuracy = pred_calculate_accuracy(validate_pred, network->layers[network->num_layers-1], ONE_HOT);
 
     // Free examples losses
@@ -394,4 +355,155 @@ void validate_model(NeuralNetwork* network, matrix* validate_data, matrix* valid
     free(example_losses);
     example_losses = NULL;
 } 
+
+void export_params(NeuralNetwork* network, char* dir_path) {
+    // Create file paths for parameters
+    char w_file_path[0xFF];
+    char b_file_path[0xFF];
+
+    strcpy(w_file_path, dir_path);
+    stpcpy(b_file_path, dir_path);
+
+    // Add on identifier for file
+    strcat(w_file_path, "/weights.csv\n");
+    strcat(b_file_path, "/biases.csv\n");
+
+    // Open files for writing
+    FILE* w_file = fopen(w_file_path, "w");
+    FILE* b_file = fopen(b_file_path, "w");
+
+    if (w_file == NULL || b_file == NULL) {
+        perror("Error opening file");
+        exit(1);
+    }
+
+    // Write out weights and biases
+    for (int i = 0; i < network->num_layers; i++) {
+        int rows = network->layers[i]->weights->dim1;
+        int cols = network->layers[i]->weights->dim2;
+
+        // Write weights to file
+        for (int j = 0; j < rows; j++) {
+            for (int k = 0; k < cols; k++) {
+                if (fprintf(w_file, "%.10f", network->layers[i]->weights->data[j * cols + k]) < 0) {
+                    perror("Error writing weights");
+                }
+                if (k < cols - 1) {
+                    fprintf(w_file, ",");
+                }
+            }
+            fprintf(w_file, "\n");
+        }
+
+        // Write biases to file
+        cols = network->layers[i]->biases->dim2;
+        for (int j = 0; j < cols; j++) {
+            if (fprintf(b_file, "%.10f", network->layers[i]->biases->data[j]) < 0) {
+                perror("Error writing biases");
+            }
+            if (j < cols - 1) {
+                fprintf(b_file, ",");
+            }
+        }
+        fprintf(b_file, "\n");
+    }
+
+    printf("Saved Network Params..\n");
+    // Close files
+    fclose(w_file);
+    fclose(b_file);
+}
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+void load_params(NeuralNetwork* network, char* dir_path) {
+
+    // Create file path for weights and biases
+    char w_file_path[0xFFF];
+    char b_file_path[0xFFF];
+
+    strcpy(w_file_path, dir_path);
+    strcpy(b_file_path, dir_path);
+
+    strcat(w_file_path, "/weights.csv");
+    strcat(b_file_path, "/biases.csv");
+
+    // Open files for reading
+    FILE* w_file = fopen(w_file_path, "r");
+    FILE* b_file = fopen(b_file_path, "r");
+
+    if (w_file == NULL || b_file == NULL) {
+        perror("Error opening file");
+        exit(1);
+    }
+
+    // Load Weights and Biases
+    for (int i = 0; i < network->num_layers; i++) {
+
+        // Get dimenstionality info 
+        int rows = network->layers[i]->weights->dim1;
+        int cols = network->layers[i]->weights->dim2;
+
+        // Ensure layer params are free
+        if (network->layers[i]->weights != NULL) {
+            free(network->layers[i]->weights->data);
+            free(network->layers[i]->weights);
+        }
+        if (network->layers[i]->biases != NULL) {
+            free(network->layers[i]->biases->data);
+            free(network->layers[i]->biases);
+        }       
+
+        // Reallocate memory
+        network->layers[i]->weights = malloc(sizeof(matrix));
+        network->layers[i]->weights->dim1 = rows; // Num Inputs
+        network->layers[i]->weights->dim2 = cols; // Num Neurons
+        network->layers[i]->weights->data = (double*) calloc(rows * cols, sizeof(double));
+
+        network->layers[i]->biases = malloc(sizeof(matrix));
+        network->layers[i]->biases->dim1 = 1;
+        network->layers[i]->biases->dim2 = cols; // Num Neurons
+        network->layers[i]->biases->data = (double*) calloc(1 * cols, sizeof(double));
+
+        // Load weights from file
+        for (int j = 0; j < rows; j++) {
+            for (int k = 0; k < cols; k++) {
+                if (fscanf(w_file, "%lf", &network->layers[i]->weights->data[j * cols + k]) != 1) {
+                    printf("Error reading weights\n");
+                    fclose(w_file);
+                    fclose(b_file);
+                    exit(1);
+                }
+                if (k < cols - 1) {
+                    fscanf(w_file, ","); // Skip comma
+                }
+            }
+            fscanf(w_file, "\n"); // Skip newline
+        }
+
+        // Load biases from file
+        cols = network->layers[i]->biases->dim2;
+        for (int j = 0; j < cols; j++) {
+            if (fscanf(b_file, "%lf", &network->layers[i]->biases->data[j]) != 1) {
+                printf("Error reading biases\n");
+                fclose(w_file);
+                fclose(b_file);
+                exit(1);
+            }
+            if (j < cols - 1) {
+                fscanf(b_file, ","); // Skip comma
+            }
+        }
+        fscanf(b_file, "\n"); // Skip newline
+    }
+
+    printf("Loaded Network Params..\n");
+
+    // Close files
+    fclose(w_file);
+    fclose(b_file);
+}
+
 

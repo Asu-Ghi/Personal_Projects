@@ -52,15 +52,15 @@ int main(int argc, char** argv) {
     // load_data("../DataSets/Spiral/train_data.csv", spiral_train.data, 0, 300, 2);
     // load_data("../DataSets/Spiral/train_labels.csv", spiral_pred.data, 0, 300, 3);
 
-    load_data("data/Spiral/train_data_1000.csv", spiral_train.data, 0, 1000, 2);
-    load_data("data/Spiral/train_labels_1000.csv", spiral_pred.data, 0, 1000, 3);
+    load_data("data/Spiral/test_data_10000.csv", spiral_train.data, 0, 1000, 2);
+    load_data("data/Spiral/test_labels_10000.csv", spiral_pred.data, 0, 1000, 3);
 
     // Load validating
     load_data("data/Spiral/test_data.csv", spiral_test.data, 0, 300, 2);
     load_data("data/Spiral/test_labels.csv", spiral_test_pred.data, 0, 300, 3);
 
     int spiral_num_features = 2;
-    int spiral_neurons_in_layer[3] = {512, 512, 3}; // Num neurons in a layer
+    int spiral_neurons_in_layer[3] = {64, 32, 3}; // Num neurons in a layer
     ActivationType spiral_activations_per_layer[3] = {RELU, RELU, SOFTMAX}; // size num layers
     OptimizationType spiral_optimizations_per_layer[3] = {ADAM, ADAM, ADAM}; // size num layers
     bool spiral_regularization_per_layer[3] = {true, true, true}; // size num layers
@@ -109,7 +109,7 @@ int main(int argc, char** argv) {
     network_spiral->decay_rate = decay_rate;
 
     // print_nn_info(network_spiral);
-    network_spiral->debug = true;
+    network_spiral->debug = false;
     network_spiral->useBiasCorrection = true; // works way better with adam for this dataset
 
     #ifdef ENABLE_PARALLEL
@@ -117,10 +117,11 @@ int main(int argc, char** argv) {
     #endif  
     train_nn(network_spiral, num_epochs, &spiral_train, &spiral_pred, &spiral_test, &spiral_test_pred);
 
-    // find_best_lr(network_spiral, &spiral_train, &spiral_pred, num_epochs,init_lr, max_lr,
-    //                          lambda1, lambda2, beta_1, beta_2, epsilon, lr_factor, decay_rate, &spiral_test, &spiral_test_pred);
 
+    // Save network params
+    char* dir_path = "results/params/Model_1";
 
+    export_params(network_spiral, dir_path);
 
     // Free memory
     free_neural_network(network_spiral);

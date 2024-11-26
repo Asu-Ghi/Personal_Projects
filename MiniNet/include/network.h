@@ -81,17 +81,21 @@ Train the neural network
 */
 void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matrix* X_validate, matrix* Y_validate);
 
-
-/*
-Predict on the network
-*/
-// Function to predict a class label for new data (for classification)
-void predict(NeuralNetwork* network, matrix* input_data);
-
 /*
 Validate a set of outputs on the model
 */
 void validate_model(NeuralNetwork* network, matrix* validate_data, matrix* validate_pred, double* loss, double* accuracy);
 
+/*
+Export network parameters into csv files
+Takes in directory to save params
+Creates csv files for Weights and Biases
+s*/
+void export_params(NeuralNetwork* network, char* dir_path);
+
+/*
+Import network params from file paths.
+*/
+void load_params(NeuralNetwork* network, char* dir_path);
 
 #endif

@@ -58,13 +58,13 @@ def save_data_csv(X, y, x_filename="features.csv", y_filename="labels.csv"):
 # main
 def main():
     num_samples = 10000
-    num_classes = 5
+    num_classes = 3
 
     # Generate data
     X, y = create_data(num_samples, num_classes)
     y = create_one_hot(y, num_classes)
 
-    save_data_csv(X, y, "/test_data_10000.csv", "/test_labels_10000.csv")
+    save_data_csv(X, y, "./test_data_10000.csv", "./test_labels_10000.csv")
 
 if __name__ == "__main__":
     main()
