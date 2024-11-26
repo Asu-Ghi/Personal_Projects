@@ -49,7 +49,7 @@ def main():
     learning_rate = np.float64(0.05)
     activations = [ActivationType.RELU, ActivationType.RELU, ActivationType.SOFTMAX]
     optimizations = [OptimizationType.ADAM, OptimizationType.ADAM, OptimizationType.ADAM]
-    regularizations = [True, True]
+    regularizations = [True, False]
     num_batch_features = 2
 
     model_ptr = create_model(num_layers, num_neurons_in_layer, activations, optimizations, regularizations,

@@ -83,8 +83,8 @@ int main(int argc, char** argv) {
     network_spiral->layers[0]->lambda_l1 = lambda1;
     network_spiral->layers[0]->lambda_l2 = lambda2;
 
-    // network_spiral->layers[1]->lambda_l1 = lambda1;
-    // network_spiral->layers[1]->lambda_l2 = lambda2;
+    network_spiral->layers[1]->lambda_l1 = lambda1;
+    network_spiral->layers[1]->lambda_l2 = lambda2;
 
     // network_spiral->layers[2]->lambda_l1 = lambda1;
     // network_spiral->layers[2]->lambda_l2 = lambda2;

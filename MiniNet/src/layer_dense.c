@@ -822,15 +822,9 @@ void forward_pass(matrix* inputs, layer_dense* layer) {
         layer->post_activation_output = malloc(sizeof(matrix));
     }
 
-    /* 
-    num_inputs x num_neurons
-    Perform matrix multiplication between inputs (dim1 x dim2) and weights (dim2 x dim3)
-    eturns batch_size x num_neuron matrix for the layer 
-    */
-    matrix* mult_matrix = matrix_mult(inputs, layer->weights);
+    matrix* mult_matrix = matrix_mult(inputs, layer->weights); // supports parallel
 
     // Add biases for the layer to the batch output data
-    // batch_size x num_neurons, where output dim1 -> batch size
     #pragma omp for collapse(2) schedule(static)
     for (int i = 0; i < layer->pre_activation_output->dim1; i++) {
         // output dim2-> num neurons
@@ -912,7 +906,7 @@ void pred_forward_pass(matrix* inputs, layer_dense* layer) {
     }
 
     // Multiply inputs and weights
-    matrix* z = matrix_mult(inputs, layer->weights);
+    matrix* z = matrix_mult(inputs, layer->weights); // supports parallel
 
     // Add biases
     #pragma omp for collapse(2) schedule(static) 
@@ -1023,32 +1017,37 @@ matrix* forward_softMax(matrix* batch_input) {
 #ifdef ENABLE_PARALLEL // Parallel approach (Not implemented)
 
     // iterate over the batch
-    for(int i = 0; i < outputs -> dim1; i++) {
+#pragma omp parallel for
+for(int i = 0; i < outputs->dim1; i++) {
 
-        //step 1: Subtract maximum value from each value in the input batch to ensure numerical stability (no large exponentiations)
-        double max = -DBL_MAX;
-        for(int j = 0; j < batch_input->dim2; j++){
-            if (batch_input->data[i*batch_input->dim2 + j] > max) {
-                max = batch_input->data[i*batch_input->dim2 + j];
-            }
+    // step 1: Subtract maximum value from each value in the input batch for numerical stability
+    double max = -DBL_MAX;
+    for(int j = 0; j < batch_input->dim2; j++) {
+        if (batch_input->data[i * batch_input->dim2 + j] > max) {
+            max = batch_input->data[i * batch_input->dim2 + j];
         }
+    }
 
-        // step 2: calculate exponentials and sum them
-        double* exp_values = (double*) calloc(batch_input->dim2, sizeof(double));
-        double sum = 0.0;
-        for(int j = 0; j < batch_input -> dim2; j++) {
-            exp_values[j] = exp(batch_input->data[i * batch_input->dim2 + j] - max);
-            sum += exp_values[j];
-        }
+    // step 2: calculate exponentials and sum them
+    double* exp_values = (double*) calloc(batch_input->dim2, sizeof(double));
+    double sum = 0.0;
 
-        // step 3: normalize exponentials by dividing by the sum to get probabilities
-        for(int j = 0; j < outputs->dim2; j++) {
-            outputs->data[i * outputs->dim2 + j] = exp_values[j] / sum;
-        }
+    // Parallelize the summation loop using reduction on sum
+    #pragma omp parallel for reduction(+:sum)
+    for(int j = 0; j < batch_input->dim2; j++) {
+        exp_values[j] = exp(batch_input->data[i * batch_input->dim2 + j] - max);
+        sum += exp_values[j];
+    }
 
-        // step 4: free temp exp values 
-        free(exp_values);
-    } 
+    // step 3: normalize exponentials by dividing by the sum to get probabilities
+    for(int j = 0; j < outputs->dim2; j++) {
+        outputs->data[i * outputs->dim2 + j] = exp_values[j] / sum;
+    }
+
+    // step 4: free temp exp values
+    free(exp_values);
+}
+
 
 # else // Sequential Approach
 
