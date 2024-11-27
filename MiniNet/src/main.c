@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
     bool spiral_regularization_per_layer[3] = {true, true, true}; // size num layers
 
     // Find best lr
-    int num_epochs = 1000;
+    int num_epochs = 50;
     double init_lr = 0.05;
     double decay_rate = 5e-5;
     int max_lr = 1;
@@ -109,7 +109,7 @@ int main(int argc, char** argv) {
     network_spiral->decay_rate = decay_rate;
 
     // print_nn_info(network_spiral);
-    network_spiral->debug = false;
+    network_spiral->debug = true;
     network_spiral->useBiasCorrection = true; // works way better with adam for this dataset
 
     #ifdef ENABLE_PARALLEL
@@ -117,15 +117,37 @@ int main(int argc, char** argv) {
     #endif  
     train_nn(network_spiral, num_epochs, &spiral_train, &spiral_pred, &spiral_test, &spiral_test_pred);
 
-
+    NeuralNetwork* test_network = init_neural_network(3, spiral_neurons_in_layer, init_lr,
+                                            spiral_activations_per_layer, spiral_optimizations_per_layer, spiral_regularization_per_layer, spiral_num_features);
+    
     // Save network params
     char* dir_path = "results/params/Model_1";
 
     export_params(network_spiral, dir_path);
 
+    test_network->layers[0]->lambda_l1 = lambda1;
+    test_network->layers[0]->lambda_l2 = lambda2;
+
+    test_network->layers[1]->lambda_l1 = lambda1;
+    test_network->layers[1]->lambda_l2 = lambda2;
+
+    test_network->layers[0]->drop_out_rate = .1;
+    test_network->layers[0]->clip_value = 0.0;
+
+    test_network->beta_1 = beta_1;
+    test_network->beta_2 = beta_2;
+    test_network->epsilon = epsilon;
+    test_network->decay_rate = decay_rate;
+    test_network->debug = true;
+
+    load_params(test_network, dir_path);
+
+    train_nn(test_network, num_epochs, &spiral_train, &spiral_pred, &spiral_test, &spiral_test_pred);
+
     // Free memory
     free_neural_network(network_spiral);
-    
+    free_neural_network(test_network);
+
     free(spiral_pred.data);
     free(spiral_train.data);
     free(spiral_test.data);

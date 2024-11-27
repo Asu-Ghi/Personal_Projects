@@ -1,6 +1,6 @@
 #include "network.h"
 
-
+////////////////////////////////////////////////// MISC METHODS ///////////////////////////////////////////////////////////////////////////
 
 NeuralNetwork* init_neural_network(int num_layers, int* num_neurons_in_layer, double learning_rate,
                                    ActivationType* activations, OptimizationType* optimizations, bool* regularizations, int num_batch_features) {
@@ -68,7 +68,6 @@ void free_neural_network(NeuralNetwork* network) {
     network->loss = 0.0;
     network->accuracy = 0.0;
     network->current_epoch = 0;
-    free(network->loss_history);
     free(network->layers);
     free(network->drop_out_per_layer);
     free(network);
@@ -106,6 +105,8 @@ void print_nn_info(NeuralNetwork* network) {
     printf("#############################################\n");
 }
 
+////////////////////////////////////////////////// FORWARD METHODS ///////////////////////////////////////////////////////////////////////////
+
 void forward_pass_nn(NeuralNetwork* network, matrix* inputs) {
 
     // First forward pass
@@ -133,6 +134,8 @@ void pred_forward_pass_nn(NeuralNetwork* network, matrix* inputs) {
     // Last forward pass
     pred_forward_pass(network->layers[network->num_layers - 2]->pred_outputs, network->layers[network->num_layers - 1]);
 }
+
+////////////////////////////////////////////////// BACKWARD METHODS ///////////////////////////////////////////////////////////////////////////
 
 void backward_pass_nn(NeuralNetwork* network, matrix* y_pred) {
 
@@ -171,6 +174,8 @@ void backward_pass_nn(NeuralNetwork* network, matrix* y_pred) {
     
 }
 
+////////////////////////////////////////////////// OPTIMIZER METHODS ///////////////////////////////////////////////////////////////////////////
+
 void update_parameters(NeuralNetwork* network) {
     // Loop through the first and all hidden layers
     for (int i = 0; i < network->num_layers; i++) {
@@ -180,12 +185,12 @@ void update_parameters(NeuralNetwork* network) {
     }   
 }
 
+/////////////////////////////////////////////// TRAINING/TESTING METHODS ///////////////////////////////////////////////////////////////////////////
+
 void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matrix* X_validate, matrix* Y_validate) {
 
     // Set num epochs
     network->num_epochs = num_epochs;
-    // Allocate memory for loss_history
-    network->loss_history = (double*) calloc(network->num_epochs, sizeof(double));
 
     // Print layer optimizations (if debug = true)
     if (network->debug) {
@@ -302,9 +307,6 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
         // Sum regularization to loss
         batch_loss += regularization_loss;
 
-        // Add loss to the loss history
-        network->loss_history[epoch] = batch_loss;
-
         // Free temp memory
         free(example_losses->data);
         free(example_losses);
@@ -356,17 +358,54 @@ void validate_model(NeuralNetwork* network, matrix* validate_data, matrix* valid
     example_losses = NULL;
 } 
 
+void predict_nn(NeuralNetwork* network, matrix* X) {
+
+    // Check to see what type of activation is used for output
+    if (network->layers[network->num_layers - 1]->activation == SOFTMAX) {
+        exit(1);
+    }
+    if (network->layers[network->num_layers - 1]->activation == SIGMOID) {
+        exit(1);
+    }
+
+}
+///////////////////////////////////////////////// SAVE/LOAD METHODS ////////////////////////////////////////////////////////////////////////////
+
 void export_params(NeuralNetwork* network, char* dir_path) {
     // Create file paths for parameters
-    char w_file_path[0xFF];
+    char w_file_path[0xFF]; // Layer Dense params
     char b_file_path[0xFF];
 
-    strcpy(w_file_path, dir_path);
-    stpcpy(b_file_path, dir_path);
+    char w_momentums_file_path[0xFF]; // Momentums
+    char b_momentums_file_path[0xFF];
 
-    // Add on identifier for file
-    strcat(w_file_path, "/weights.csv\n");
-    strcat(b_file_path, "/biases.csv\n");
+    char w_caches_file_path[0xFF]; // Caches
+    char b_caches_file_path[0xFF];
+
+    char hp_file_path[0xFF]; // Hyper params
+
+    strcpy(w_file_path, dir_path);
+    strcpy(b_file_path, dir_path);
+
+    strcpy(w_momentums_file_path, dir_path);
+    strcpy(b_momentums_file_path, dir_path);
+
+    strcpy(w_caches_file_path, dir_path);
+    strcpy(b_caches_file_path, dir_path);  
+
+    strcpy(hp_file_path, dir_path);
+
+    // Add on identifier for files
+    strcat(w_file_path, "/weights.csv");
+    strcat(b_file_path, "/biases.csv");
+
+    strcat(w_momentums_file_path, "/weight_momentums.csv");
+    strcat(b_momentums_file_path, "/bias_momentums.csv");
+
+    strcat(w_caches_file_path, "/weight_caches.csv");
+    strcat(b_caches_file_path, "/bias_caches.csv");
+
+    strcat(hp_file_path, "/hyper_params.json");
 
     // Open files for writing
     FILE* w_file = fopen(w_file_path, "w");
@@ -377,70 +416,211 @@ void export_params(NeuralNetwork* network, char* dir_path) {
         exit(1);
     }
 
-    // Write out weights and biases
+    FILE* wm_file = fopen(w_momentums_file_path, "w");
+    FILE* bm_file = fopen(b_momentums_file_path, "w");
+
+    if (wm_file == NULL || bm_file == NULL) {
+        perror("Error opening file");
+        exit(1);
+    }
+
+    FILE* wc_file = fopen(w_caches_file_path, "w");
+    FILE* bc_file = fopen(b_caches_file_path, "w");
+
+    if (wc_file == NULL || bc_file == NULL) {
+        perror("Error opening file");
+        exit(1);
+    }
+
+    // Save hyperparams first
+    cJSON* json = cJSON_CreateObject(); // Json file to save hyperparams
+    cJSON_AddNumberToObject(json, "learning_rate", network->learning_rate);
+    cJSON_AddNumberToObject(json, "current_epoch", network->current_epoch);
+    cJSON_AddNumberToObject(json, "beta1", network->beta_1);
+    cJSON_AddNumberToObject(json, "beta2", network->beta_2);
+    cJSON_AddNumberToObject(json, "epsilon", network->epsilon);
+    cJSON_AddNumberToObject(json, "l2_lambda", network->layers[0]->lambda_l2); // same lambda l2 for all layers
+
+    // Write JSON to file
+    FILE* hyper_file = fopen(hp_file_path, "w");
+    if (hyper_file == NULL) {
+        perror("Error opening hyper param json file for writing");
+        cJSON_Delete(json);
+        return;
+    }
+
+    // Convert to JSON string
+    char *json_string = cJSON_Print(json);
+
+
+    // Check if JSON string was created
+    if (json_string == NULL) {
+        printf("Error creating JSON string\n");
+        exit(1);
+    }
+
+    // Write to file
+    fprintf(hyper_file, "%s\n", json_string);
+    fclose(hyper_file);
+    cJSON_Delete(json);
+
+
+    // Write out weights biases and optimization params
     for (int i = 0; i < network->num_layers; i++) {
         int rows = network->layers[i]->weights->dim1;
         int cols = network->layers[i]->weights->dim2;
 
-        // Write weights to file
+        // Write weight related params to file
         for (int j = 0; j < rows; j++) {
             for (int k = 0; k < cols; k++) {
                 if (fprintf(w_file, "%.10f", network->layers[i]->weights->data[j * cols + k]) < 0) {
                     perror("Error writing weights");
                 }
+                if (fprintf(wm_file, "%.10f", network->layers[i]->w_velocity->data[j * cols + k]) < 0) {
+                    perror("Error writing weight momentums");
+                }
+                if (fprintf(wc_file, "%.10f", network->layers[i]->cache_weights->data[j * cols + k]) < 0) {
+                    perror("Error writing weight caches");
+                }
                 if (k < cols - 1) {
                     fprintf(w_file, ",");
+                    fprintf(wm_file, ",");
+                    fprintf(wc_file, ",");
                 }
             }
             fprintf(w_file, "\n");
+            fprintf(wm_file, "\n");
+            fprintf(wc_file, "\n");
         }
 
-        // Write biases to file
+        // Write biase related params to file
         cols = network->layers[i]->biases->dim2;
         for (int j = 0; j < cols; j++) {
             if (fprintf(b_file, "%.10f", network->layers[i]->biases->data[j]) < 0) {
                 perror("Error writing biases");
             }
+            if (fprintf(bm_file, "%.10f", network->layers[i]->b_velocity->data[j]) < 0) {
+                perror("Error writing bias momentums");
+            }
+            if (fprintf(bc_file, "%.10f", network->layers[i]->cache_bias->data[j]) < 0) {
+                perror("Error writing bias caches");
+            }
             if (j < cols - 1) {
                 fprintf(b_file, ",");
+                fprintf(bm_file, ",");
+                fprintf(bc_file, ",");
             }
         }
         fprintf(b_file, "\n");
+        fprintf(bm_file, "\n");
+        fprintf(bc_file, "\n");
     }
 
     printf("Saved Network Params..\n");
+
     // Close files
     fclose(w_file);
     fclose(b_file);
+    fclose(wm_file);
+    fclose(bm_file);
+    fclose(wc_file);
+    fclose(bc_file);
 }
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 void load_params(NeuralNetwork* network, char* dir_path) {
 
     // Create file path for weights and biases
-    char w_file_path[0xFFF];
-    char b_file_path[0xFFF];
+    // Create file paths for parameters
+    char w_file_path[0xFF];
+    char b_file_path[0xFF];
+
+    char w_momentums_file_path[0xFF];
+    char b_momentums_file_path[0xFF];
+
+    char w_caches_file_path[0xFF];
+    char b_caches_file_path[0xFF];
+
+    char hp_file_path[0xFF];
 
     strcpy(w_file_path, dir_path);
-    strcpy(b_file_path, dir_path);
+    stpcpy(b_file_path, dir_path);
 
+    strcpy(w_momentums_file_path, dir_path);
+    strcpy(b_momentums_file_path, dir_path);
+
+    strcpy(w_caches_file_path, dir_path);
+    strcpy(b_caches_file_path, dir_path);  
+
+    strcpy(hp_file_path, dir_path);
+
+    // Add on identifier for file
     strcat(w_file_path, "/weights.csv");
     strcat(b_file_path, "/biases.csv");
 
+    strcat(w_momentums_file_path, "/weight_momentums.csv");
+    strcat(b_momentums_file_path, "/bias_momentums.csv");
+
+    strcat(w_caches_file_path, "/weight_caches.csv");
+    strcat(b_caches_file_path, "/bias_caches.csv");
+
+    strcat(hp_file_path, "/hyper_params.json");
+
     // Open files for reading
+
     FILE* w_file = fopen(w_file_path, "r");
     FILE* b_file = fopen(b_file_path, "r");
-
     if (w_file == NULL || b_file == NULL) {
         perror("Error opening file");
         exit(1);
     }
 
-    // Load Weights and Biases
+    FILE* wm_file = fopen(w_momentums_file_path, "r");
+    FILE* bm_file = fopen(b_momentums_file_path, "r");
+    if (wm_file == NULL || bm_file == NULL) {
+        perror("Error opening file");
+        exit(1);
+    }
+
+    FILE* wc_file = fopen(w_caches_file_path, "r");
+    FILE* bc_file = fopen(b_caches_file_path, "r");
+    if (wc_file == NULL || bc_file == NULL) {
+        perror("Error opening file");
+        exit(1);
+    }
+
+    // Load hyperparams
+    FILE* hyper_file = fopen(hp_file_path, "r");
+    if (hyper_file == NULL) {
+        perror("Error opening file for reading");
+        return;
+    }
+
+    fseek(hyper_file, 0, SEEK_END);
+    long length = ftell(hyper_file);
+    fseek(hyper_file, 0, SEEK_SET);
+
+    char* buffer = (char*)malloc(length + 1);
+    fread(buffer, 1, length, hyper_file);
+    buffer[length] = '\0';
+    fclose(hyper_file);
+
+    cJSON* json = cJSON_Parse(buffer);
+    if (!json) {
+        printf("Error parsing JSON\n");
+        free(buffer);
+        return;
+    }
+
+    network->learning_rate = cJSON_GetObjectItem(json, "learning_rate")->valuedouble;
+    network->current_epoch = cJSON_GetObjectItem(json, "current_epoch")->valueint;
+    network->beta_1 = cJSON_GetObjectItem(json, "beta1")->valuedouble;
+    network->beta_2 = cJSON_GetObjectItem(json, "beta2")->valuedouble;
+    network->epsilon = cJSON_GetObjectItem(json, "epsilon")->valuedouble;
+
+    // Iterate through every layer
     for (int i = 0; i < network->num_layers; i++) {
+        // Set lambda from json
+        network->layers[i]->lambda_l2 = cJSON_GetObjectItem(json, "l2_lambda")->valuedouble;   
 
         // Get dimenstionality info 
         int rows = network->layers[i]->weights->dim1;
@@ -454,9 +634,27 @@ void load_params(NeuralNetwork* network, char* dir_path) {
         if (network->layers[i]->biases != NULL) {
             free(network->layers[i]->biases->data);
             free(network->layers[i]->biases);
-        }       
+        } 
 
-        // Reallocate memory
+        if (network->layers[i]->w_velocity != NULL) {
+            free(network->layers[i]->w_velocity->data);
+            free(network->layers[i]->w_velocity);        
+        }   
+        if (network->layers[i]->b_velocity != NULL) {
+            free(network->layers[i]->b_velocity->data);
+            free(network->layers[i]->b_velocity);        
+        } 
+
+        if (network->layers[i]->cache_weights != NULL) {
+            free(network->layers[i]->cache_weights->data);
+            free(network->layers[i]->cache_weights);        
+        }             
+        if (network->layers[i]->cache_bias != NULL) {
+            free(network->layers[i]->cache_bias->data);
+            free(network->layers[i]->cache_bias);        
+        } 
+
+        // Allocate Weight and Bias Memory
         network->layers[i]->weights = malloc(sizeof(matrix));
         network->layers[i]->weights->dim1 = rows; // Num Inputs
         network->layers[i]->weights->dim2 = cols; // Num Neurons
@@ -467,36 +665,117 @@ void load_params(NeuralNetwork* network, char* dir_path) {
         network->layers[i]->biases->dim2 = cols; // Num Neurons
         network->layers[i]->biases->data = (double*) calloc(1 * cols, sizeof(double));
 
-        // Load weights from file
+        // Allocate Momentum memory
+        network->layers[i]->w_velocity = malloc(sizeof(matrix));
+        network->layers[i]->w_velocity->dim1 = rows;
+        network->layers[i]->w_velocity->dim2 = cols; // Num Neurons
+        network->layers[i]->w_velocity->data = (double*) calloc(rows * cols, sizeof(double));
+
+        network->layers[i]->b_velocity = malloc(sizeof(matrix));
+        network->layers[i]->b_velocity->dim1 = 1;
+        network->layers[i]->b_velocity->dim2 = cols; // Num Neurons
+        network->layers[i]->b_velocity->data = (double*) calloc(1 * cols, sizeof(double));
+
+        // Allocate cache memory
+        network->layers[i]->cache_weights = malloc(sizeof(matrix));
+        network->layers[i]->cache_weights->dim1 = rows;
+        network->layers[i]->cache_weights->dim2 = cols; // Num Neurons
+        network->layers[i]->cache_weights->data = (double*) calloc(rows * cols, sizeof(double));
+
+        network->layers[i]->cache_bias = malloc(sizeof(matrix));
+        network->layers[i]->cache_bias->dim1 = 1;
+        network->layers[i]->cache_bias->dim2 = cols; // Num Neurons
+        network->layers[i]->cache_bias->data = (double*) calloc(1 * cols, sizeof(double));
+
+        // Load weight related parameters from file
         for (int j = 0; j < rows; j++) {
             for (int k = 0; k < cols; k++) {
+                // Weights
                 if (fscanf(w_file, "%lf", &network->layers[i]->weights->data[j * cols + k]) != 1) {
                     printf("Error reading weights\n");
                     fclose(w_file);
                     fclose(b_file);
+                    fclose(wm_file);
+                    fclose(wc_file);
+                    fclose(bm_file);
+                    fclose(bc_file);
+                    exit(1);
+                }
+                // Weight Momentums
+                if (fscanf(wm_file, "%lf", &network->layers[i]->w_velocity->data[j * cols + k]) != 1) {
+                    printf("Error reading weight momenutms\n");
+                    fclose(w_file);
+                    fclose(b_file);
+                    fclose(wm_file);
+                    fclose(wc_file);
+                    fclose(bm_file);
+                    fclose(bc_file);
+                    exit(1);
+                }
+                // Weight Caches
+                if (fscanf(wc_file, "%lf", &network->layers[i]->cache_weights->data[j * cols + k]) != 1) {
+                    printf("Error reading weights\n");
+                    fclose(w_file);
+                    fclose(b_file);
+                    fclose(wm_file);
+                    fclose(wc_file);
+                    fclose(bm_file);
+                    fclose(bc_file);
                     exit(1);
                 }
                 if (k < cols - 1) {
                     fscanf(w_file, ","); // Skip comma
+                    fscanf(wm_file, ","); // Skip comma
+                    fscanf(wc_file, ","); // Skip comma
                 }
             }
             fscanf(w_file, "\n"); // Skip newline
+            fscanf(wm_file, "\n"); // Skip newline
+            fscanf(wc_file, "\n"); // Skip newline
         }
 
-        // Load biases from file
+        // Load biase related parameters from file
         cols = network->layers[i]->biases->dim2;
         for (int j = 0; j < cols; j++) {
             if (fscanf(b_file, "%lf", &network->layers[i]->biases->data[j]) != 1) {
                 printf("Error reading biases\n");
                 fclose(w_file);
                 fclose(b_file);
+                fclose(wm_file);
+                fclose(wc_file);
+                fclose(bm_file);
+                fclose(bc_file);
+                exit(1);
+            }
+            if (fscanf(bm_file, "%lf", &network->layers[i]->b_velocity->data[j]) != 1) {
+                printf("Error reading bias momentums\n");
+                fclose(w_file);
+                fclose(b_file);
+                fclose(wm_file);
+                fclose(wc_file);
+                fclose(bm_file);
+                fclose(bc_file);
+                exit(1);
+            }
+            if (fscanf(bc_file, "%lf", &network->layers[i]->cache_bias->data[j]) != 1) {
+                printf("Error reading bias caches\n");
+                fclose(w_file);
+                fclose(b_file);
+                fclose(wm_file);
+                fclose(wc_file);
+                fclose(bm_file);
+                fclose(bc_file);
                 exit(1);
             }
             if (j < cols - 1) {
                 fscanf(b_file, ","); // Skip comma
+                fscanf(bm_file, ","); // Skip comma
+                fscanf(bc_file, ","); // Skip comma
             }
         }
         fscanf(b_file, "\n"); // Skip newline
+        fscanf(bm_file, "\n"); // Skip newline
+        fscanf(bc_file, "\n"); // Skip newline
     }
 
     printf("Loaded Network Params..\n");
@@ -504,6 +783,8 @@ void load_params(NeuralNetwork* network, char* dir_path) {
     // Close files
     fclose(w_file);
     fclose(b_file);
+    cJSON_Delete(json);
+    free(buffer);
 }
 
 

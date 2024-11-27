@@ -13,12 +13,12 @@ has_param() {
 }
 
 # Variables
-SRC_FILES="src/main.c src/network.c src/layer_dense.c src/utils.c"
+SRC_FILES="src/main.c src/network.c src/layer_dense.c src/utils.c libs/cJSON.c"
 INCLUDE_DIR="include/"
 BUILD_DIR="build/"
 OUTPUT_FILE="${BUILD_DIR}main"
 SHARED_LIB_OUTPUT="${BUILD_DIR}libnn.so"  # Shared library output file
-CFLAGS="-O3 -march=native -funroll-loops -lm -ftree-vectorize -I ${INCLUDE_DIR}"
+CFLAGS="-O3 -march=native -funroll-loops -lm -ftree-vectorize -I ${INCLUDE_DIR} -I libs/"
 PARALLEL_FLAG=""
 DIAGNOSTIC_FLAG=""
 

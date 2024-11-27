@@ -26,7 +26,6 @@ typedef struct {
     double decay_rate; // Optimization learning decay rate
     int num_epochs;  // Total number of epochs
     int current_epoch; // Current epoch iteration
-    double* loss_history; // History over batch losses
     double* accuracy_history; // History of accuracy over training
     bool momentum; // Momentum flag
     double beta_1; // Momentum Hyperparameter
