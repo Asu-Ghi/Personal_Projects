@@ -296,6 +296,7 @@ void free_layer(layer_dense* layer) {
         layer->pre_activation_output = NULL;
     }
     if (layer->post_activation_output != NULL) {
+        printf("FREEING!\n");
         free(layer->post_activation_output->data);
         free(layer->post_activation_output);    
         layer->post_activation_output = NULL;

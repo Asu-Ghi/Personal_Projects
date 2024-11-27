@@ -65,9 +65,6 @@ void free_neural_network(NeuralNetwork* network) {
     for (int i = 0; i < network->num_layers; i++) {
         free_layer(network->layers[i]);
     }
-    network->loss = 0.0;
-    network->accuracy = 0.0;
-    network->current_epoch = 0;
     free(network->layers);
     free(network->drop_out_per_layer);
     free(network);
