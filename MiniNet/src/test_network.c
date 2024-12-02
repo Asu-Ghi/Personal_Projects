@@ -15,32 +15,32 @@ matrix mnist_X, mnist_Y, mnist_pred_X, mnist_pred_Y;
 
 
     mnist_pred_X.dim1 = 100; // 100 samples
-    mnist_pred_X.dim2 = 784; // 785 pixel values
+    mnist_pred_X.dim2 = 784; // 784 pixel values
     mnist_pred_X.data = (double*) calloc(mnist_pred_X.dim1 * mnist_pred_X.dim2,sizeof(double));
 
     mnist_pred_Y.dim1 = 100; // 100 samples
-    mnist_pred_Y.dim2 = 10; // 10 labels (digits 1 - 10)
+    mnist_pred_Y.dim2 = 10; // 10 labels (digits 0 - 9)
     mnist_pred_Y.data = (double*) calloc(mnist_pred_Y.dim1 * mnist_pred_Y.dim2,sizeof(double));
     
     load_mnist_data("data/MNIST/mnist_test.csv", mnist_X.data, mnist_Y.data, 1000);
     load_mnist_data("data/MNIST/mnist_train.csv", mnist_pred_X.data, mnist_pred_Y.data, 100);
-    int mnist_n_layers = 2;
+    int mnist_n_layers = 3;
     int mnist_n_features = 784;
-    int num_neurons_mnist[2] = {784, 10};
-    ActivationType activations_mnist[2] = {RELU, SOFTMAX};
-    OptimizationType optimizations_mnist[3] = {ADAM, ADAM};
-    bool regularizations_mnist[5] = {true, true};
-    double mnist_lr = 0.05;
+    int num_neurons_mnist[3] = {784, 512, 10};
+    ActivationType activations_mnist[3] = {RELU, RELU ,SOFTMAX};
+    OptimizationType optimizations_mnist[3] = {ADAM, ADAM, ADAM};
+    bool regularizations_mnist[3] = {true, true, true};
+    double mnist_lr = 0.0005;
     int mnist_num_epochs = 1000;
     double init_lr = 0.05;
     double decay_rate = 5e-7;
     int max_lr = 1;
     double lr_factor = 1.01;
     double epsilon = 1e-7;
-    double beta_1 = 0.9; // Momentums
+    double beta_1 = 0.85; // Momentums
     double beta_2 = 0.925; // RMS PROP CACHE
-    double lambda1 = 1e-5;
-    double lambda2 = 5e-4;
+    double lambda1 = 1e-4;
+    double lambda2 = 5e-3;
 
     NeuralNetwork* mnist_network = init_neural_network(mnist_n_layers, num_neurons_mnist, mnist_lr,
                                             activations_mnist, optimizations_mnist, regularizations_mnist, mnist_n_features);
@@ -58,18 +58,12 @@ matrix mnist_X, mnist_Y, mnist_pred_X, mnist_pred_Y;
     mnist_network->layers[1]->lambda_l1 = lambda1;
     mnist_network->layers[1]->lambda_l2 = lambda2;
 
-    // mnist_network->layers[2]->lambda_l1 = lambda1;
-    // mnist_network->layers[2]->lambda_l2 = lambda2;
+    mnist_network->layers[2]->lambda_l1 = lambda1;
+    mnist_network->layers[2]->lambda_l2 = lambda2;
 
-    // mnist_network->layers[3]->lambda_l1 = lambda1;
-    // mnist_network->layers[3]->lambda_l2 = lambda2;
+    mnist_network->layers[0]->drop_out_rate = 0.0;
+    mnist_network->layers[1]->drop_out_rate = 0.4;
 
-    // mnist_network->layers[4]->lambda_l1 = lambda1;
-    // mnist_network->layers[4]->lambda_l2 = lambda2;
-
-
-    mnist_network->layers[0]->drop_out_rate = 0.3;
-    // mnist_network->layers[1]->drop_out_rate = 0.3;
     char* dir_path = "results/params/Mnist";
     mnist_network->send_ratio = 1; // send socket data every n epochs
     print_nn_info(mnist_network); // print network info
