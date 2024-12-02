@@ -10,7 +10,7 @@ output: html_document
 - Open MP support
 - Visualization matplotlib toolkit in python
 
-![Mnist Demonstration](MiniNet/results/demonstrations/mnist_2_layer_dem.png)
+![Mnist Demonstration](results/demonstrations/mnist_2_layer_dem.png)
 
 ## Planned Work
 - Support for CNN and RNN layers
