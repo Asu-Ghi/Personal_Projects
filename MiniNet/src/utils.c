@@ -336,7 +336,6 @@ matrix* matrix_mult(matrix* w, matrix* v) {
     }
 
 #ifdef ENABLE_PARALLEL 
-    // double start_time = omp_get_wtime();
     // Perform the matrix multiplication
     #pragma omp parallel 
     {   
@@ -360,9 +359,6 @@ matrix* matrix_mult(matrix* w, matrix* v) {
             }
         }
     }
-    // double end_time = omp_get_wtime();
-    // printf("Matrix multiplication completed in %.6f seconds.\n", end_time - start_time);
-
 
 #else 
         for (int i = 0; i < rows_w; i++) {
@@ -624,9 +620,6 @@ matrix* matrix_scalar_sum(matrix* w, double s, bool useAbs) {
     return result; // return pointer to matrix
 }
 
-
-
-//////////////////////////////////////////////////// CUDA LIN ALG METHODS //////////////////////////////////////////////////////////////
 
 
 
