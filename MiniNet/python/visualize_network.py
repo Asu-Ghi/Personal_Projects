@@ -104,16 +104,16 @@ def update(frame):
             axes[3].set_ylim(0, initial_val_loss + 1.5 * initial_val_loss)
 
         # Update the lines in each subplot with new data and set distinct colors
-        lines[0].set_data(epochs, accuracies)  # Accuracy vs Epoch (Blue)
+        lines[0].set_data(epochs, accuracies)  
         lines[0].set_color('blue')
         
-        lines[1].set_data(epochs, losses)      # Loss vs Epoch (Red)
+        lines[1].set_data(epochs, losses)      
         lines[1].set_color('red')
         
-        lines[2].set_data(epochs, val_accuracies)  # Validation Accuracy vs Epoch (Blue)
+        lines[2].set_data(epochs, val_accuracies)  
         lines[2].set_color('blue')
         
-        lines[3].set_data(epochs, val_losses)  # Validation Loss vs Epoch (Red)
+        lines[3].set_data(epochs, val_losses) 
         lines[3].set_color('red')
 
     except Exception as e:

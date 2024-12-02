@@ -6,7 +6,6 @@ output: html_document
 ---
 
 ## Current Work  
-
 - Open MP support
 - Visualization matplotlib toolkit in python
 
