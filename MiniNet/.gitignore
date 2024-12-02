@@ -53,4 +53,3 @@ libnn.so
 *.dSYM/
 
 
-MiniNet/data/MNIST/mnist_train.csv
