@@ -20,7 +20,8 @@ Handles
 #include <float.h> 
 #include <stdbool.h>
 #include "cJSON.h" // Saving parameters
-
+#include <unistd.h> // Socket work
+#include <arpa/inet.h> // Socket work
 
 //////////////////////////////////////////////////// Data Structures //////////////////////////////////////////////////////////////
 /*

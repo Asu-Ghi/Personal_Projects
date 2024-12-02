@@ -1,5 +1,5 @@
 #include "network.h"
-
+#define DIR_PATH "results/params/Model_1"
 ////////////////////////////////////////////////// MISC METHODS ///////////////////////////////////////////////////////////////////////////
 
 NeuralNetwork* init_neural_network(int num_layers, int* num_neurons_in_layer, double learning_rate,
@@ -27,7 +27,8 @@ NeuralNetwork* init_neural_network(int num_layers, int* num_neurons_in_layer, do
     n_network->accuracy = 0.0; // init to 0
     n_network->loss = 0.0; // init to 0
     n_network->useBiasCorrection = true; // Set by default, set to false if ADAM not performing well
-
+    n_network->early_stopping = false; // Set by default to be false.
+    n_network->send_ratio = 50; // set to send socket data every 50 epochs by default.
     // Allocate memory for layers
     n_network->layers = (layer_dense**) malloc(n_network->num_layers * sizeof(layer_dense*));
 
@@ -202,6 +203,13 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
     double loss_time = 0.0;
     double regularization_time = 0.0;
     double validate_time = 0.0;
+
+    // Setup the socket once
+    #ifdef ENABLE_SOCKET
+    printf("Setting up socket...\n");
+    int sockfd = setup_socket();
+    #endif
+
     // Epoch Iterations
     for (int epoch = 0; epoch < network->num_epochs; epoch++) {
         // reset batch loss
@@ -262,7 +270,6 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
         // Update loss and accuracy of network
         network->loss = batch_loss;
         network->accuracy = accuracy;
-
         // Validate Network every 50 epochs
         if (epoch % 50 == 0) {
             free_layers_memory(network);
@@ -278,13 +285,23 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
                 best_val_acc = network->val_accuracy;
             }
             // Check for improvement (ratio between previous and current loss greater than factor f)
-            if (prev_val_loss/network->val_loss < 1.1) {
+            if (prev_val_loss/network->val_loss < 1.1 && network->early_stopping) {
                 current_time += 1;
                 if (current_time > max_time) {
                     printf("Early Stopping Training.\n");
-                    print_nn_info(network);     
-                    break;
-                }
+                    // Send the final data before exiting to ensure the plots don't reset
+                    #ifdef ENABLE_SOCKET
+                    send_data(network, sockfd);
+                    #endif
+                    
+                    // Send final validation loss and accuracy data (for plotting)
+                    #ifdef ENABLE_SOCKET
+                    send_data(network, sockfd);
+                    usleep(100000); // Sleep for 100 ms (or adjust as needed)
+                    close(sockfd); // Ensure socket is closed before exiting  
+                    #endif
+                    exit(0);
+              }
             }
             else {
                 current_time = 0; // Reset stop time.
@@ -294,7 +311,14 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
             double validate_end_time = omp_get_wtime();
             validate_time += (validate_end_time - validate_start_time);
         }
-        // Print training data (if debug = TRUE)
+
+        // Send data every 50 epochs
+        #ifdef ENABLE_SOCKET
+        if (epoch % network->send_ratio == 0) {
+            send_data(network, sockfd);
+        }        
+        #endif
+
         if (network->debug) {
             printf("Epoch %d: Loss = %f (data_loss: %f, reg_loss: %f), Accuracy = %f, LR = %f \n", network->current_epoch, batch_loss+regularization_loss,
                         batch_loss, regularization_loss, accuracy, network->learning_rate);
@@ -325,6 +349,12 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
     printf("regularization loss time = %f\n", regularization_time / network->num_epochs);
     printf("optimization time = %f\n", optimization_time / network->num_epochs);
     #endif
+
+    // Close socket
+    #ifdef ENABLE_SOCKET
+    close(sockfd);
+    #endif
+
 }
 
 void validate_model(NeuralNetwork* network, matrix* validate_data, matrix* validate_pred, double* loss, double* accuracy) {
@@ -788,4 +818,43 @@ void load_params(NeuralNetwork* network, char* dir_path) {
     free(buffer);
 }
 
+int setup_socket() {
+    int sockfd;
+    struct sockaddr_in server_addr;
+
+    // Create socket
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(8080);  // Port number
+    server_addr.sin_addr.s_addr = INADDR_ANY;  // Localhost
+
+    // Connect to the server
+    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Connection failed");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    return sockfd;
+}
+
+void send_data(NeuralNetwork* network, int sockfd) {
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddNumberToObject(json, "current_epoch", network->current_epoch);
+    cJSON_AddNumberToObject(json, "num_epochs", network->num_epochs);
+    cJSON_AddNumberToObject(json, "accuracy", network->accuracy);
+    cJSON_AddNumberToObject(json, "loss", network->loss);
+    cJSON_AddNumberToObject(json, "val_accuracy", network->val_accuracy);
+    cJSON_AddNumberToObject(json, "val_loss", network->val_loss);
+
+    char *json_string = cJSON_PrintUnformatted(json);
+    send(sockfd, json_string, strlen(json_string), 0);
+
+    free(json_string);
+    cJSON_Delete(json);
+}
 

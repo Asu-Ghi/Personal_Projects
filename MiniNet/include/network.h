@@ -38,6 +38,7 @@ typedef struct {
     double val_loss; // Stores network validation loss after each epoch
     bool useBiasCorrection; // Flag to determine wheter to use bias correction in ADAM
     bool early_stopping; // Flag to determine wheter to stop training early based on val_loss ratio
+    int send_ratio; // ratio of num epoch that determines when to send socket data
 } NeuralNetwork;
 
 /*
@@ -96,5 +97,15 @@ void export_params(NeuralNetwork* network, char* dir_path);
 Import network params from file paths.
 */
 void load_params(NeuralNetwork* network, char* dir_path);
+
+/*
+Function to setup socket once
+*/
+int setup_socket();
+
+/*
+Serialize and pass network data to socket
+*/
+void send_data(NeuralNetwork* network, int sockfd);
 
 #endif

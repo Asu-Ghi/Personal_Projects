@@ -13,7 +13,7 @@ has_param() {
 }
 
 # Variables
-SRC_FILES="src/main.c src/network.c src/layer_dense.c src/utils.c libs/cJSON.c"
+SRC_FILES="src/main.c src/network.c src/layer_dense.c src/utils.c libs/cJSON.c src/test_network.c"
 INCLUDE_DIR="include/"
 BUILD_DIR="build/"
 OUTPUT_FILE="${BUILD_DIR}main"
@@ -21,6 +21,7 @@ SHARED_LIB_OUTPUT="${BUILD_DIR}libnn.so"  # Shared library output file
 CFLAGS="-O3 -march=native -funroll-loops -lm -ftree-vectorize -I ${INCLUDE_DIR} -I libs/"
 PARALLEL_FLAG=""
 DIAGNOSTIC_FLAG=""
+SOCKET_FLAG=""
 
 # Check for flags
 if has_param "-parallel" "$@"; then
@@ -51,6 +52,18 @@ if has_param "-shared" "$@"; then
     exit 0
 fi
 
+# Run the Python script if the -python flag is set
+if has_param "-python" "$@"; then
+    echo "Running Python script: python/visualize_network.py"
+    python python/visualize_network.py &
+    if [[ $? -ne 0 ]]; then
+        echo "Python script failed. Exiting."
+        exit 1
+    fi
+    SOCKET_FLAG="-D ENABLE_SOCKET"
+    sleep 2
+fi
+
 # Create build directory if it doesn't exist
 if [[ ! -d "$BUILD_DIR" ]]; then
     echo "Creating build directory: $BUILD_DIR"
@@ -59,7 +72,7 @@ fi
 
 # Default Compilation (Executable)
 echo "Compiling the program..."
-clang $CFLAGS $PARALLEL_FLAG $DIAGNOSTIC_FLAG $SRC_FILES -o $OUTPUT_FILE
+clang $CFLAGS $SOCKET_FLAG $PARALLEL_FLAG $DIAGNOSTIC_FLAG $SRC_FILES -o $OUTPUT_FILE
 
 # Check if compilation was successful
 if [[ $? -ne 0 ]]; then

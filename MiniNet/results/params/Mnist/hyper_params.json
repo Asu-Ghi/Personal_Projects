@@ -1,0 +1,8 @@
+{
+	"learning_rate":	0.0303442242014501,
+	"current_epoch":	1000,
+	"beta1":	0.9,
+	"beta2":	0.925,
+	"epsilon":	1e-07,
+	"l2_lambda":	0.0005
+}
