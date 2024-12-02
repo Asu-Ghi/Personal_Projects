@@ -29,8 +29,8 @@ if has_param "-parallel" "$@"; then
 fi
 
 if has_param "-diag" "$@"; then
-    echo "Compiling with sanitizer diagnostics enabled..."
-    DIAGNOSTIC_FLAG="-fsanitize=address -g"
+    echo "Compiling with debugging diagnostics flag enabled..."
+    DIAGNOSTIC_FLAG="-fsanitize=address,undefined -g"
 fi
 
 if has_param "-shared" "$@"; then

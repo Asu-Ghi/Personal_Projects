@@ -62,6 +62,7 @@ NeuralNetwork* init_neural_network(int num_layers, int* num_neurons_in_layer, do
 }
 
 void free_neural_network(NeuralNetwork* network) {
+    printf("Freeing network memory...\n");
     for (int i = 0; i < network->num_layers; i++) {
         free_layer(network->layers[i]);
     }
@@ -118,20 +119,6 @@ void forward_pass_nn(NeuralNetwork* network, matrix* inputs) {
     forward_pass(network->layers[network->num_layers - 2]->post_activation_output, network->layers[network->num_layers - 1]);
 }
 
-void pred_forward_pass_nn(NeuralNetwork* network, matrix* inputs) {
-
-    // First forward pass
-    pred_forward_pass(inputs, network->layers[0]);
-
-    // Forward pass for hidden layers
-    for(int i = 1; i < network->num_layers; i++) {
-        pred_forward_pass(network->layers[i - 1]->pred_outputs, network->layers[i]);
-    }
-
-    // Last forward pass
-    pred_forward_pass(network->layers[network->num_layers - 2]->pred_outputs, network->layers[network->num_layers - 1]);
-}
-
 ////////////////////////////////////////////////// BACKWARD METHODS ///////////////////////////////////////////////////////////////////////////
 
 void backward_pass_nn(NeuralNetwork* network, matrix* y_pred) {
@@ -139,17 +126,6 @@ void backward_pass_nn(NeuralNetwork* network, matrix* y_pred) {
     // Start with the backward pass for softmax and loss
     if (network->layers[network->num_layers-1]->activation == SOFTMAX) {
         backwards_softmax_and_loss(y_pred, network->layers[network->num_layers-1]);
-
-        // test later. apply to loop
-
-        // free(network->layers[network->num_layers-1]->post_activation_output->data);
-        // free(network->layers[network->num_layers-1]->post_activation_output);
-
-        // free(network->layers[network->num_layers-1]->pre_activation_output->data);
-        // free(network->layers[network->num_layers-1]->pre_activation_output);
-
-        // free(network->layers[network->num_layers-1]->inputs->data);
-        // free(network->layers[network->num_layers-1]->inputs);
     }
     else {
         printf("Not handled.\n");
@@ -163,6 +139,11 @@ void backward_pass_nn(NeuralNetwork* network, matrix* y_pred) {
         if (network->layers[i]->activation == RELU){
             backward_reLu(network->layers[i+1]->dinputs, network->layers[i]);
         }
+
+        else if (network->layers[i]->activation == LINEAR) {
+            backward_linear(network->layers[i+1]->dinputs, network->layers[i]);
+        }
+
         else {
             printf("Not handled.\n");
             exit(1);
@@ -206,6 +187,12 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
     double val_loss, val_accuracy;
     // best val loss for training
     double best_val_loss = DBL_MAX;
+    // best val acc for training
+    double best_val_acc = 0;
+    // Early stopping variables
+    double prev_val_loss = 0; // Previous validate loss
+    int max_time = 5; // Maximum number of validate iterations to wait before seeing loss improvements
+    int current_time = 0; // Current wait iteration
 
     // DEBUGING TIME
     double backward_time = 0.0;
@@ -236,20 +223,17 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
         double accuracy_end_time = omp_get_wtime();
         accuracy_time += (accuracy_end_time - accuracy_start_time);
     
-
         double loss_start_time = omp_get_wtime();
         matrix* example_losses = loss_categorical_cross_entropy(Y, network->layers[network->num_layers-1], ONE_HOT);
         for (int i = 0; i < Y->dim1; i++) {
             batch_loss+= example_losses->data[i];
         }
         batch_loss = batch_loss/Y->dim1;
-        example_losses = NULL;
         double loss_end_time = omp_get_wtime();
         loss_time += (loss_end_time - loss_start_time);
 
         // Free examples losses
-        free(example_losses->data);
-        free(example_losses);       
+        free_matrix(example_losses);     
 
         // Calculate regularization for l1 and l2 
         double regularization_start_time = omp_get_wtime();
@@ -281,18 +265,34 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
 
         // Validate Network every 50 epochs
         if (epoch % 50 == 0) {
-            #ifdef ENABLE_PARALLEL
+            free_layers_memory(network);
             double validate_start_time = omp_get_wtime();
-            #endif
-
             validate_model(network, X_validate, Y_validate, &val_loss, &val_accuracy);
             network->val_accuracy = val_accuracy;
             network->val_loss = val_loss;
-
-            #ifdef ENABLE_PARALLEL
+            // Check to update best loss
+            if (network->val_loss < best_val_loss) {
+                best_val_loss = network->val_loss;
+            }
+            if (network->val_accuracy > best_val_acc) {
+                best_val_acc = network->val_accuracy;
+            }
+            // Check for improvement (ratio between previous and current loss greater than factor f)
+            if (prev_val_loss/network->val_loss < 1.1) {
+                current_time += 1;
+                if (current_time > max_time) {
+                    printf("Early Stopping Training.\n");
+                    print_nn_info(network);     
+                    break;
+                }
+            }
+            else {
+                current_time = 0; // Reset stop time.
+            }
+            // Update current validate loss
+            prev_val_loss = network->val_loss;
             double validate_end_time = omp_get_wtime();
             validate_time += (validate_end_time - validate_start_time);
-            #endif
         }
         // Print training data (if debug = TRUE)
         if (network->debug) {
@@ -304,10 +304,6 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
         // Sum regularization to loss
         batch_loss += regularization_loss;
 
-        // Free temp memory
-        free(example_losses->data);
-        free(example_losses);
-
         // Free undeeded memory in layers
         free_layers_memory(network);
 
@@ -315,7 +311,10 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
     // Print Final Accuracy
     printf("Epoch %d: Loss = %f , Accuracy = %f, LR = %f \n", network->current_epoch, batch_loss,
             accuracy, network->learning_rate);
-    
+    printf("Validate Loss = %f, Validate Accuracy = %f\n", val_loss, val_accuracy);
+    printf("Best validation loss = %f\n", best_val_loss);
+    printf("Best validation acc = %f\n", best_val_acc);
+
     // Print time debugs
     #ifdef ENABLE_PARALLEL
     printf("forward time = %f\n", forward_time / network->num_epochs);
@@ -329,13 +328,16 @@ void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matr
 }
 
 void validate_model(NeuralNetwork* network, matrix* validate_data, matrix* validate_pred, double* loss, double* accuracy) {
+    // Set validation flags for all layers
+    for(int i = 0; i < network->num_layers; i++) {
+        network->layers[i]->is_training = false;
+    }
+    
     // Perform a forward pass on validate data
-    // pred_forward_pass_nn(network, validate_data);
-    pred_forward_pass_nn(network, validate_data);
+    forward_pass_nn(network, validate_data);
     // Get loss
     double batch_loss = 0.0;
-    // matrix* example_losses = pred_loss_categorical_cross_entropy(validate_pred, network->layers[network->num_layers-1], ONE_HOT);
-    matrix* example_losses = pred_loss_categorical_cross_entropy(validate_pred, network->layers[network->num_layers-1], ONE_HOT);
+    matrix* example_losses = loss_categorical_cross_entropy(validate_pred, network->layers[network->num_layers-1], ONE_HOT);
 
     // Sum all example losses
     for (int i = 0; i < validate_data->dim1; i++) {
@@ -346,13 +348,15 @@ void validate_model(NeuralNetwork* network, matrix* validate_data, matrix* valid
     *loss = batch_loss / validate_data->dim1;
 
     // Get Accuracy
-    // *accuracy = pred_calculate_accuracy(validate_pred, network->layers[network->num_layers-1], ONE_HOT);
-    *accuracy = pred_calculate_accuracy(validate_pred, network->layers[network->num_layers-1], ONE_HOT);
+    *accuracy = calculate_accuracy(validate_pred, network->layers[network->num_layers-1], ONE_HOT);
+
+    // Set training flags for all layers
+    for(int i = 0; i < network->num_layers; i++) {
+        network->layers[i]->is_training = true;
+    }
 
     // Free examples losses
-    free(example_losses->data);
-    free(example_losses);
-    example_losses = NULL;
+    free_matrix(example_losses);
 } 
 
 void predict_nn(NeuralNetwork* network, matrix* X) {

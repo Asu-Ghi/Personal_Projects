@@ -54,6 +54,7 @@ typedef enum {
     RELU,
     SOFTMAX,
     SIGMOID,
+    LINEAR,
     TANH
 } ActivationType;
 
@@ -80,14 +81,15 @@ void load_iris_data(char* file_path, matrix* X_train, matrix* Y_train, matrix* X
                     matrix* Y_test, int num_batches, double train_ratio);
 
 /*
-Loads X data set
+Loads Spiral Data set
 */
-void load_data(const char *filename, double *data, int start_row, int end_row, int cols);
+void load_spiral_data(const char *filename, double *data, int start_row, int end_row, int cols);
 
 /*
-Loads Y labels
+Loads Mnist Data
 */
-void load_labels(const char *filename, int *labels, int size);
+void load_mnist_data(char* filename, double* X, double* Y, int num_samples);
+
 
 /*
 Convert Optimization enum to a string
@@ -100,7 +102,16 @@ Convert Activation Enum to a String
 */
 char* activation_type_to_string(ActivationType type);
 
+/*
+Allocates memory on the heap for a matrix object.
+Checks memory allocation.
+*/
+matrix* allocate_matrix(int dim1, int dim2);
 
+/*
+Frees matrix struct. Checks for dangling pointers.
+*/
+void free_matrix(matrix* M);
 
 //////////////////////////////////////////////////// Linear Algebra Methods //////////////////////////////////////////////////////////////
 
@@ -154,7 +165,7 @@ Returns a matrix of scalar sum between matrix
 w and scalar s. 
 Allocates memory on the heap for the return matrix
 */
-matrix* matrix_scalar_sum(matrix* w, double s);
+matrix* matrix_scalar_sum(matrix* w, double s, bool useAbs);
 
 
 #endif

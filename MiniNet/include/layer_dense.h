@@ -11,6 +11,8 @@ Layer Dense data structure.
 */
 typedef struct {
     int id; // Integer id of layer
+    bool is_training; // flag to differentiate between validate and train pass
+
     int num_neurons; // Number of Neurons in a layer
     int num_inputs; // Number of Input Features into a layer
 
@@ -18,11 +20,9 @@ typedef struct {
     matrix* biases; // Layer Biases
 
     matrix* inputs; // Inputs used for training
-    matrix* pred_inputs; // Inputs used for predictions 
 
     matrix* pre_activation_output; // Outputs used for training (before activation)
     matrix* post_activation_output; // Outputs used for training (after activation)
-    matrix* pred_outputs; // Outputs used for predictions
     
     matrix* dweights; // Gradients for weights
     matrix* dbiases; // Gradients for biases
@@ -83,12 +83,6 @@ Calculates the accuracy of the network while training.
 */
 double calculate_accuracy(matrix* class_targets, layer_dense* final_layer, ClassLabelEncoding encoding);
 
-/*
-Calculates accuracy for predictions.
-*/
-double pred_calculate_accuracy(matrix* class_targets, layer_dense* final_layer, ClassLabelEncoding encoding);
-
-
 //////////////////////////////////////////////////// LOSS METHODS ///////////////////////////////////////////////////////////////////////////
 
 /*
@@ -96,11 +90,10 @@ Calculates the categorical cross entropy loss of the network while training.
 */
 matrix* loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer, ClassLabelEncoding encoding);
 
-
 /*
-Calculates loss for predictions.
+Calculates loss for binary cross entropy.
 */
-matrix* pred_loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer, ClassLabelEncoding encoding);
+matrix* loss_binary_cross_entropy(layer_dense* layer, matrix* Y);
 
 /*
 Calculates regularization loss l1 and l2 for a given layer.
@@ -113,11 +106,6 @@ double calculate_regularization_loss(layer_dense* layer);
 Performs a forward pass using a batch of inputs and a given layer (Training).
 */
 void forward_pass(matrix* inputs, layer_dense* layer);
-
-/*
-Forward Pass for prediction inputs only.
-*/
-void pred_forward_pass(matrix* inputs, layer_dense* layer);
 
 /*
 Forward Pass for layers with ReLu
@@ -134,6 +122,10 @@ Forward Pass for layers with sigMoid
 */
 matrix* forward_sigmoid(matrix* inputs);
 
+/*
+Returns inputs. Applies nothing, does nothing, exists only for clarity in code.
+*/
+matrix* forward_linear(matrix* inputs);
 
 ////////////////////////////////////////////////// BACKWARD METHODS ///////////////////////////////////////////////////////////////////////////
 
@@ -143,14 +135,19 @@ Backward pass for layers with ReLu
 void backward_reLu(matrix* input_gradients, layer_dense* layer);
 
 /*
-Backward pass for layers with SoftMax
+Backward pass for layers with linear activation.
+*/
+void backward_linear(matrix* input_gradients, layer_dense* layer);
+
+/*
+Backward pass for layers with SoftMax (Categorical Cross Entropy)
 */
 void backwards_softmax_and_loss(matrix* true_labels, layer_dense* layer);
 
 /*
-Backward pass for layers with Sigmoid
+Backward pass for layers with Sigmoid (Binary Cross Entropy)
 */
-void backwards_sigmoid(matrix* input_gradients, layer_dense* layer);
+void backwards_sigmoid_and_loss(matrix* true_labels, layer_dense* layer);
 
 /*
 Calculate relu gradients -> used in backward_relu
@@ -205,7 +202,7 @@ void update_params_sgd_momentum(layer_dense* layer, double* learning_rate, int c
 /*
 ADA GRAD Optimization
 */
-void update_params_adagrad(layer_dense* layer, double* learning_rate, double decay_rate, double epsilon);
+void update_params_adagrad(layer_dense* layer, double* learning_rate, int current_epoch, double decay_rate, double epsilon);
 
 /*
 RMSPROP Optimization

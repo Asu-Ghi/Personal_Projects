@@ -135,7 +135,7 @@ void load_iris_data(char* file_path, matrix* X_train, matrix* Y_train, matrix* X
     free(Y_temp.data);
 }
 
-void load_data(const char* filename, double* data, int start_row, int end_row, int cols) {
+void load_spiral_data(const char* filename, double* data, int start_row, int end_row, int cols) {
     FILE* file = fopen(filename, "r");
     if (!file) {
         fprintf(stderr, "Error: Could not open file %s\n", filename);
@@ -172,15 +172,34 @@ void load_data(const char* filename, double* data, int start_row, int end_row, i
     fclose(file);
 }
 
-void load_labels(const char *filename, int *labels, int size) {
-    FILE *file = fopen(filename, "r");
-    if (file == NULL) {
-        fprintf(stderr, "Error opening file: %s\n", filename);
+void load_mnist_data(char* filename, double* X, double* Y, int num_samples) {
+    FILE* file = fopen(filename, "r");
+    int image_size = 784;
+    int num_classes = 10;
+    int sample_index = 0;
+    if (!file) {
+        fprintf(stderr, "Error: Could not open file %s\n", filename);
         exit(1);
-    }
+    }   
 
-    for (int i = 0; i < size; i++) {
-        fscanf(file, "%d,", &labels[i]);
+    char line[10000]; 
+    while (fgets(line, sizeof(line), file) && sample_index < num_samples) {
+        char *token = strtok(line, ",");
+        int label = atoi(token);
+
+        // One-hot encode the label
+        for (int i = 0; i < num_classes; i++) {
+            Y[sample_index * num_classes + i] = (i == label) ? 1.0 : 0.0;
+        }
+
+        // Read the image data
+        int pixel_idx = 0;
+        while ((token = strtok(NULL, ",")) != NULL && pixel_idx < image_size) {
+            X[sample_index * image_size + pixel_idx] = atof(token);
+            pixel_idx++;
+        }
+
+        sample_index++;
     }
     fclose(file);
 }
@@ -206,7 +225,33 @@ char* activation_type_to_string(ActivationType type) {
     }
 }
 
+matrix* allocate_matrix(int dim1, int dim2) {
+    matrix* M = malloc(sizeof(matrix));
+    M->dim1 = dim1;
+    M->dim2 = dim2;
+    M->data = (double*) calloc(dim1 * dim2, sizeof(double));
 
+    if (M->data == NULL) {
+        fprintf(stderr, "Memory Allocation failed in allocate matrix.\n");
+        printf("Expected Dim size = (%d x %d)\n", dim1, dim2);
+        exit(1);
+    }
+
+    return M;
+}
+
+void free_matrix(matrix* M) {
+    free(M->data);
+    M->data = NULL;
+    if (M->data != NULL) {
+        fprintf(stderr, "Error: Freeing memory failed in free matrix.\n");
+    }
+    free(M);
+    M = NULL;
+    if (M != NULL) {
+        fprintf(stderr, "Error: Freeing memory failed in free matrix.\n");
+    }   
+}
 //////////////////////////////////////////////////// SEQ/OMP LIN ALG METHODS //////////////////////////////////////////////////////////////
 
 matrix* transpose_matrix(matrix* w){
@@ -537,7 +582,7 @@ matrix* matrix_sum(matrix* w, matrix* v) {
 }
 
 // Includes ifdef for parallelization
-matrix* matrix_scalar_sum(matrix* w, double s) {
+matrix* matrix_scalar_sum(matrix* w, double s, bool useAbs) {
 
     // Allocate memory for the result
     matrix* result = malloc(sizeof(matrix));
@@ -555,14 +600,23 @@ matrix* matrix_scalar_sum(matrix* w, double s) {
 
     #pragma omp for schedule(static) // No race conditions, each thread gets its own i
     for (int i = 0; i < result->dim1 * result->dim2; i++) {
-        result->data[i] += s;
+        if (useAbs){
+            result->data[i] = fabs(w->data[i] + s); // useAbs allows for more control.
+        }
+        else {
+            result->data[i] = w->data[i] + s;
+        }
     }
 
 
 #else // Sequential Approach
-
     for (int i = 0; i < result->dim1 * result->dim2; i++) {
-        result->data[i] += s;
+        if (useAbs){
+            result->data[i] = fabs(w->data[i] + s);
+        }
+        else {
+            result->data[i] = w->data[i] + s;
+        }
     }
 
 #endif

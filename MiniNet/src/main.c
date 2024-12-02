@@ -1,7 +1,6 @@
 #include "network.h"
+#include "test_network.h"
 
-#define NUM_FEATURES 4
-#define NUM_CLASSES 3
 #define NUM_THREADS 8
 
 /*
@@ -19,137 +18,72 @@ int main(int argc, char** argv) {
     #ifdef ENABLE_PARALLEL
     omp_set_num_threads(NUM_THREADS); // Set the number of threads to 8
     #endif 
-
-    char* file_path = "../data/iris/iris.csv"; // Define file path for data
-    matrix X_train, Y_train, X_test, Y_test; // Create matrix objects for data loading
-    int num_batches = 150; // 120 training examples in Iris dataset
-    double train_ratio = 0.1; // 80% of the data used for training
-
-    // Load Iris Data Set    
-    // load_iris_data(file_path, &X_train, &Y_train, &X_test, &Y_test, num_batches, train_ratio);
-
-    // Load spiral data
-    // Init training
-    matrix spiral_train, spiral_pred, spiral_test, spiral_test_pred;
-    spiral_train.dim1 = 1000;
-    spiral_train.dim2 = 2;
-    spiral_train.data = (double*) calloc(spiral_train.dim1 * spiral_train.dim2, sizeof(double));
-
-    spiral_pred.dim1 = 1000;
-    spiral_pred.dim2 = 3;
-    spiral_pred.data = (double*) calloc(spiral_pred.dim1 * spiral_pred.dim2, sizeof(double));
-
-    // Init validating
-    spiral_test.dim1 = 300;
-    spiral_test.dim2 = 2;
-    spiral_test.data = (double*) calloc(spiral_test.dim1 * spiral_test.dim2, sizeof(double));
-
-    spiral_test_pred.dim1 = 300;
-    spiral_test_pred.dim2 = 3;
-    spiral_test_pred.data = (double*) calloc(spiral_test_pred.dim1 * spiral_test_pred.dim2, sizeof(double));
-
-    // Load training
-    // load_data("../DataSets/Spiral/train_data.csv", spiral_train.data, 0, 300, 2);
-    // load_data("../DataSets/Spiral/train_labels.csv", spiral_pred.data, 0, 300, 3);
-
-    load_data("data/Spiral/test_data_10000.csv", spiral_train.data, 0, 1000, 2);
-    load_data("data/Spiral/test_labels_10000.csv", spiral_pred.data, 0, 1000, 3);
-
-    // Load validating
-    load_data("data/Spiral/test_data.csv", spiral_test.data, 0, 300, 2);
-    load_data("data/Spiral/test_labels.csv", spiral_test_pred.data, 0, 300, 3);
-
-    int spiral_num_features = 2;
-    int spiral_neurons_in_layer[3] = {64, 32, 3}; // Num neurons in a layer
-    ActivationType spiral_activations_per_layer[3] = {RELU, RELU, SOFTMAX}; // size num layers
-    OptimizationType spiral_optimizations_per_layer[3] = {ADAM, ADAM, ADAM}; // size num layers
-    bool spiral_regularization_per_layer[3] = {true, true, true}; // size num layers
-
-    // Find best lr
-    int num_epochs = 50;
-    double init_lr = 0.05;
-    double decay_rate = 5e-5;
-    int max_lr = 1;
-    double lr_factor = 1.01;
-    double epsilon = 1e-7;
-    double beta_1 = 0.85; // Momentums
-    double beta_2 = 0.9; // RMS PROP CACHE
-    double lambda1 = 5e-6;
-    double lambda2 = 5e-6;
-
-    NeuralNetwork* network_spiral = init_neural_network(3, spiral_neurons_in_layer, init_lr,
-                                            spiral_activations_per_layer, spiral_optimizations_per_layer, spiral_regularization_per_layer, spiral_num_features);
     
-    network_spiral->layers[0]->lambda_l1 = lambda1;
-    network_spiral->layers[0]->lambda_l2 = lambda2;
+    /*
+    Testing network on mnist data
+    */
+    matrix mnist_X, mnist_Y, mnist_pred_X, mnist_pred_Y;
 
-    network_spiral->layers[1]->lambda_l1 = lambda1;
-    network_spiral->layers[1]->lambda_l2 = lambda2;
+    mnist_X.dim1 = 10000; // 10k samples
+    mnist_X.dim2 = 784; // 785 pixel values
+    mnist_X.data = (double*) calloc(mnist_X.dim1 * mnist_X.dim2,sizeof(double));
 
-    // network_spiral->layers[2]->lambda_l1 = lambda1;
-    // network_spiral->layers[2]->lambda_l2 = lambda2;
-
-    // network_spiral->layers[3]->lambda_l1 = lambda1;
-    // network_spiral->layers[3]->lambda_l2 = lambda2;
-
-    network_spiral->layers[0]->drop_out_rate = .1;
-    // network_spiral->layers[1]->drop_out_rate = 0.3;
-    // network_spiral->layers[2]->drop_out_rate = 0.3;
-    // network_spiral->layers[3]->drop_out_rate = 0.3;
+    mnist_Y.dim1 = 10000; // 10k samples
+    mnist_Y.dim2 = 10; // 10 labels (digits 1 - 10)
+    mnist_Y.data = (double*) calloc(mnist_Y.dim1 * mnist_Y.dim2,sizeof(double));
 
 
-    network_spiral->layers[0]->clip_value = 0.0;
-    // network_spiral->layers[1]->clip_value = 0.0;
-    // network_spiral->layers[2]->clip_value = 1;
-    // network_spiral->layers[3]->clip_value = 1;
+    mnist_pred_X.dim1 = 100; // 100 samples
+    mnist_pred_X.dim2 = 784; // 785 pixel values
+    mnist_pred_X.data = (double*) calloc(mnist_pred_X.dim1 * mnist_pred_X.dim2,sizeof(double));
 
-    network_spiral->beta_1 = beta_1;
-    network_spiral->beta_2 = beta_2;
-    network_spiral->epsilon = epsilon;
-    network_spiral->decay_rate = decay_rate;
-
-    // print_nn_info(network_spiral);
-    network_spiral->debug = true;
-    network_spiral->useBiasCorrection = true; // works way better with adam for this dataset
-
-    #ifdef ENABLE_PARALLEL
-    printf("NUMBER OF CPU CORES: %d\n", NUM_THREADS);
-    #endif  
-    train_nn(network_spiral, num_epochs, &spiral_train, &spiral_pred, &spiral_test, &spiral_test_pred);
-
-    NeuralNetwork* test_network = init_neural_network(3, spiral_neurons_in_layer, init_lr,
-                                            spiral_activations_per_layer, spiral_optimizations_per_layer, spiral_regularization_per_layer, spiral_num_features);
+    mnist_pred_Y.dim1 = 100; // 100 samples
+    mnist_pred_Y.dim2 = 10; // 10 labels (digits 1 - 10)
+    mnist_pred_Y.data = (double*) calloc(mnist_pred_Y.dim1 * mnist_pred_Y.dim2,sizeof(double));
     
-    // Save network params
+    load_mnist_data("data/MNIST/mnist_test.csv", mnist_X.data, mnist_Y.data, 10000);
+    load_mnist_data("data/MNIST/mnist_train.csv", mnist_pred_X.data, mnist_pred_Y.data, 100);
+    int mnist_n_layers = 2;
+    int mnist_n_features = 784;
+    int num_neurons_mnist[2] = {784, 10};
+    ActivationType activations_mnist[2] = {RELU, SOFTMAX};
+    OptimizationType optimizations_mnist[3] = {ADAM, ADAM};
+    bool regularizations_mnist[5] = {true, true};
+    double mnist_lr = 0.05;
+
+
+    NeuralNetwork* mnist_network = init_neural_network(mnist_n_layers, num_neurons_mnist, mnist_lr,
+                                            activations_mnist, optimizations_mnist, regularizations_mnist, mnist_n_features);
+
+    int mnist_num_epochs = 100;
+    mnist_network->beta_2 = beta_2;
+    mnist_network->epsilon = epsilon;
+    mnist_network->decay_rate = decay_rate;
+    mnist_network->debug = true;
+    mnist_network->useBiasCorrection = true;
+    mnist_network->decay_rate = decay_rate;
+
+    mnist_network->layers[0]->lambda_l1 = lambda1;
+    mnist_network->layers[0]->lambda_l2 = lambda2;
+
+    mnist_network->layers[1]->lambda_l1 = lambda1;
+    mnist_network->layers[1]->lambda_l2 = lambda2;
+
+    // mnist_network->layers[2]->lambda_l1 = lambda1;
+    // mnist_network->layers[2]->lambda_l2 = lambda2;
+
+    // mnist_network->layers[3]->lambda_l1 = lambda1;
+    // mnist_network->layers[3]->lambda_l2 = lambda2;
+
+    // mnist_network->layers[4]->lambda_l1 = lambda1;
+    // mnist_network->layers[4]->lambda_l2 = lambda2;
+
+
+    mnist_network->layers[0]->drop_out_rate = 0.3;
+    // mnist_network->layers[1]->drop_out_rate = 0.3;
     char* dir_path = "results/params/Model_1";
+    // load_params(mnist_network, dir_path);
+    train_nn(mnist_network, mnist_num_epochs, &mnist_X, &mnist_Y, &mnist_pred_X, &mnist_pred_Y);
 
     export_params(network_spiral, dir_path);
-
-    test_network->layers[0]->lambda_l1 = lambda1;
-    test_network->layers[0]->lambda_l2 = lambda2;
-
-    test_network->layers[1]->lambda_l1 = lambda1;
-    test_network->layers[1]->lambda_l2 = lambda2;
-
-    test_network->layers[0]->drop_out_rate = .1;
-    test_network->layers[0]->clip_value = 0.0;
-
-    test_network->beta_1 = beta_1;
-    test_network->beta_2 = beta_2;
-    test_network->epsilon = epsilon;
-    test_network->decay_rate = decay_rate;
-    test_network->debug = true;
-
-    load_params(test_network, dir_path);
-
-    train_nn(test_network, num_epochs, &spiral_train, &spiral_pred, &spiral_test, &spiral_test_pred);
-
-    // Free memory
-    free_neural_network(network_spiral);
-    free_neural_network(test_network);
-
-    free(spiral_pred.data);
-    free(spiral_train.data);
-    free(spiral_test.data);
-    free(spiral_test_pred.data);
 }
