@@ -8,7 +8,9 @@ output: html_document
 ## Current Work  
 
 - Open MP support
-- C Types shared Python library
+- Visualization matplotlib toolkit in python
+
+![Mnist Demonstration](MiniNet/results/demonstrations/mnist_2_layer_dem.png)
 
 ## Planned Work
 - Support for CNN and RNN layers
