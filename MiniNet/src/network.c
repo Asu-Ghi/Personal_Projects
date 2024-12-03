@@ -429,6 +429,7 @@ void train_mini_batch(NeuralNetwork* network, int num_epochs, int batch_size, Tr
         if (i % 5 == 0) {
             free_layers_memory(network); // Free network memory before validation
             validate_model(network, training_data->X_pred, training_data->Y_pred, &network->val_loss, &network->val_accuracy);
+            free_layers_memory(network); // Free network memory after validation
         }
         // Print metrics
         if (network->debug) {
@@ -464,6 +465,7 @@ void validate_model(NeuralNetwork* network, matrix* validate_data, matrix* valid
 
     // Get Accuracy
     *accuracy = calculate_accuracy(validate_pred, network->layers[network->num_layers-1]);
+
     // Set training flags for all layers
     for(int i = 0; i < network->num_layers; i++) {
         network->layers[i]->is_training = true;

@@ -3,25 +3,25 @@
 void test_mnist() {
 matrix mnist_X, mnist_Y, mnist_pred_X, mnist_pred_Y;
 
-    mnist_X.dim1 = 10000; // 10k samples
+    mnist_X.dim1 = 60000; // 10k samples
     mnist_X.dim2 = 784; // 785 pixel values
     mnist_X.data = (double*) calloc(mnist_X.dim1 * mnist_X.dim2,sizeof(double));
 
-    mnist_Y.dim1 = 10000; // 10k samples
+    mnist_Y.dim1 = 60000; // 10k samples
     mnist_Y.dim2 = 10; // 10 labels (digits 1 - 10)
     mnist_Y.data = (double*) calloc(mnist_Y.dim1 * mnist_Y.dim2,sizeof(double));
 
 
-    mnist_pred_X.dim1 = 1000; // 100 samples
+    mnist_pred_X.dim1 = 10000; // 100 samples
     mnist_pred_X.dim2 = 784; // 784 pixel values
     mnist_pred_X.data = (double*) calloc(mnist_pred_X.dim1 * mnist_pred_X.dim2,sizeof(double));
 
-    mnist_pred_Y.dim1 = 1000; // 100 samples
+    mnist_pred_Y.dim1 = 10000; // 100 samples
     mnist_pred_Y.dim2 = 10; // 10 labels (digits 0 - 9)
     mnist_pred_Y.data = (double*) calloc(mnist_pred_Y.dim1 * mnist_pred_Y.dim2,sizeof(double));
     
-    load_mnist_data("data/MNIST/mnist_test.csv", mnist_X.data, mnist_Y.data, 10000);
-    load_mnist_data("data/MNIST/mnist_train.csv", mnist_pred_X.data, mnist_pred_Y.data, 1000);
+    load_mnist_data("data/MNIST/mnist_train.csv", mnist_X.data, mnist_Y.data, 60000);
+    load_mnist_data("data/MNIST/mnist_test.csv", mnist_pred_X.data, mnist_pred_Y.data, 10000);
     Training_Data training_data = {&mnist_X, &mnist_Y, &mnist_pred_X, &mnist_pred_Y};
 
     int mnist_n_layers = 4;
@@ -83,6 +83,91 @@ matrix mnist_X, mnist_Y, mnist_pred_X, mnist_pred_Y;
     free(mnist_pred_Y.data);
 
 }
+
+void test_fashion_mnist() {
+matrix mnist_X, mnist_Y, mnist_pred_X, mnist_pred_Y;
+
+    mnist_X.dim1 = 10000; // 10k samples
+    mnist_X.dim2 = 784; // 785 pixel values
+    mnist_X.data = (double*) calloc(mnist_X.dim1 * mnist_X.dim2,sizeof(double));
+
+    mnist_Y.dim1 = 10000; // 10k samples
+    mnist_Y.dim2 = 10; // 10 labels (digits 1 - 10)
+    mnist_Y.data = (double*) calloc(mnist_Y.dim1 * mnist_Y.dim2,sizeof(double));
+
+
+    mnist_pred_X.dim1 = 1000; // 100 samples
+    mnist_pred_X.dim2 = 784; // 784 pixel values
+    mnist_pred_X.data = (double*) calloc(mnist_pred_X.dim1 * mnist_pred_X.dim2,sizeof(double));
+
+    mnist_pred_Y.dim1 = 1000; // 100 samples
+    mnist_pred_Y.dim2 = 10; // 10 labels (digits 0 - 9)
+    mnist_pred_Y.data = (double*) calloc(mnist_pred_Y.dim1 * mnist_pred_Y.dim2,sizeof(double));
+    
+    load_mnist_data("data/MNIST/fashion-mnist_train.csv", mnist_X.data, mnist_Y.data, 10000);
+    load_mnist_data("data/MNIST/fashion-mnist_test.csv", mnist_pred_X.data, mnist_pred_Y.data, 1000);
+    Training_Data training_data = {&mnist_X, &mnist_Y, &mnist_pred_X, &mnist_pred_Y};
+
+    int mnist_n_layers = 4;
+    int mnist_n_features = 784;
+    int num_neurons_mnist[4] = {784, 512, 128, 10};
+    ActivationType activations_mnist[4] = {RELU, RELU, RELU, SOFTMAX};
+    OptimizationType optimizations_mnist[4] = {ADAM, ADAM, ADAM, ADAM};
+    bool regularizations_mnist[4] = {true, true, true, true};
+    double mnist_lr = 0.05;
+    int mnist_num_epochs = 200;
+    double decay_rate = 5e-5;
+    int max_lr = 1;
+    double lr_factor = 1.01;
+    long double epsilon = 1e-7;
+    double beta_1 = 0.9; // Momentums
+    double beta_2 = 0.95; // RMS PROP CACHE
+    double lambda1 = 1e-7;
+    double lambda2 = 5e-6;
+
+    NeuralNetwork* mnist_network = init_neural_network(mnist_n_layers, num_neurons_mnist, mnist_lr,
+                                            activations_mnist, optimizations_mnist, regularizations_mnist, mnist_n_features);
+
+    mnist_network->beta_1 = beta_1;
+    mnist_network->beta_2 = beta_2;
+    mnist_network->epsilon = epsilon;
+    mnist_network->decay_rate = decay_rate;
+    mnist_network->debug = true;
+    mnist_network->useBiasCorrection = true;
+    mnist_network->decay_rate = decay_rate;
+    
+    mnist_network->layers[0]->lambda_l1 = lambda1;
+    mnist_network->layers[0]->lambda_l2 = lambda2;
+
+    mnist_network->layers[1]->lambda_l1 = lambda1;
+    mnist_network->layers[1]->lambda_l2 = lambda2;
+
+    mnist_network->layers[2]->lambda_l1 = lambda1;
+    mnist_network->layers[2]->lambda_l2 = lambda2;
+
+    mnist_network->layers[3]->lambda_l1 = lambda1;
+    mnist_network->layers[3]->lambda_l2 = lambda2;
+
+    mnist_network->layers[0]->drop_out_rate = 0.0;
+    mnist_network->layers[1]->drop_out_rate = 0.1;
+    mnist_network->layers[2]->drop_out_rate = 0.1;
+    mnist_network->layers[3]->drop_out_rate = 0.0;
+
+
+
+    char* dir_path = "results/params/Mnist";
+    mnist_network->send_ratio = 1; // send socket data every n epochs
+    // train_full_batch(mnist_network, mnist_num_epochs, &training_data);
+    train_mini_batch(mnist_network, mnist_num_epochs, 1000, &training_data);
+
+    free_neural_network(mnist_network);
+    free(mnist_X.data);
+    free(mnist_Y.data);
+    free(mnist_pred_X.data);
+    free(mnist_pred_Y.data);
+
+}
+
 
 void test_spiral() {
 

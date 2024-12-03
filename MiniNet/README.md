@@ -21,7 +21,6 @@ output: html_document
 - Not as efficient as id like, *see strong scaling studies*
 
 ## Results
-
 ### Figure 1: Mnist Training Demonstration with 3 layers (Full Batch)
 - Full batch training results in longer training times and greater number of epochs required to reach satisfactory validation accuracy.
 ![Mnist Demonstration 3 Layers](results/demonstrations/Mnist_3_layer_dem.png)
