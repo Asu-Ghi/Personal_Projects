@@ -21,25 +21,34 @@ typedef struct {
     int* num_neurons_in_layer; // Array of num neurons in each layer respectively
     int num_layers; // Number of layers in network
     int batch_size; // Size of input batch
+    int mini_batch_size; // Size of mini batch (if using)
     int num_features; // Number of features in input data
     double learning_rate; // Optimization learning rate
     double decay_rate; // Optimization learning decay rate
     int num_epochs;  // Total number of epochs
     int current_epoch; // Current epoch iteration
     double* accuracy_history; // History of accuracy over training
-    bool momentum; // Momentum flag
     double beta_1; // Momentum Hyperparameter
     double beta_2; // Cache Hyperparameter
     double epsilon; // Optimization Hyperparameter
     bool debug; // Prints learning vals after each epoch, otherwise just once at the end
     double accuracy; // Stores network accuracy after each epoch
     double loss; // Stores network loss after each epoch
+    double reg_loss; // Stores regularization loss for network
     double val_accuracy; // Stores network validation accuracy after each epoch
     double val_loss; // Stores network validation loss after each epoch
-    bool useBiasCorrection; // Flag to determine wheter to use bias correction in ADAM
+    bool useBiasCorrection; // Flag to determine whether to use bias correction in ADAM
+    bool useWeightDecay; // Flag to determine whether to use weight decay for ADAM
     bool early_stopping; // Flag to determine wheter to stop training early based on val_loss ratio
     int send_ratio; // ratio of num epoch that determines when to send socket data
 } NeuralNetwork;
+
+typedef struct {
+    matrix* X; 
+    matrix* Y;
+    matrix* X_pred;
+    matrix* Y_pred;
+} Training_Data;
 
 /*
 Initializes the Neural Network architechture 
@@ -77,9 +86,19 @@ Update the parameters of the neural network
 void update_parameters(NeuralNetwork* network);
 
 /*
+Updates learning rate
+*/
+void update_learning_rate(NeuralNetwork* network);
+
+/*
 Train the neural network
 */
-void train_nn(NeuralNetwork* network, int num_epochs, matrix* X, matrix* Y, matrix* X_validate, matrix* Y_validate);
+void train_full_batch(NeuralNetwork* network, int num_epochs, Training_Data* training_data);
+
+/*
+Trains on mini batches
+*/
+void train_mini_batch(NeuralNetwork* network, int num_epochs, int batch_size, Training_Data* training_data);
 
 /*
 Validate a set of outputs on the model

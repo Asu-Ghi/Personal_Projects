@@ -59,15 +59,6 @@ typedef enum {
     TANH
 } ActivationType;
 
-/*
-Class label encoding enum structure
-Enum to store what type of vector the class label is.
-*/
-typedef enum {
-    ONE_HOT,
-    SPARSE
-} ClassLabelEncoding;
-
 /////////////////////////////////////////////////////// Misc. Methods /////////////////////////////////////////////////////////////////
 
 /*
@@ -113,6 +104,11 @@ matrix* allocate_matrix(int dim1, int dim2);
 Frees matrix struct. Checks for dangling pointers.
 */
 void free_matrix(matrix* M);
+
+/*
+Shallow copies a select portion of the matrix src
+*/
+void shallow_cpy_matrix(matrix* src, matrix* dest, int start_row, int num_rows);
 
 //////////////////////////////////////////////////// Linear Algebra Methods //////////////////////////////////////////////////////////////
 

@@ -17,7 +17,7 @@ SRC_FILES="src/main.c src/network.c src/layer_dense.c src/utils.c libs/cJSON.c s
 INCLUDE_DIR="include/"
 BUILD_DIR="build/"
 OUTPUT_FILE="${BUILD_DIR}main"
-CFLAGS="-O3 -g -march=native -funroll-loops -fopenmp -lm -ftree-vectorize -I ${INCLUDE_DIR} -I libs/"
+CFLAGS="-O3 -march=native -funroll-loops -ftree-vectorize -g -fopenmp  -lm -I ${INCLUDE_DIR} -I libs/"
 PARALLEL_FLAG=""
 DIAGNOSTIC_FLAG=""
 SOCKET_FLAG=""

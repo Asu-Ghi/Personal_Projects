@@ -301,7 +301,7 @@ void free_memory(layer_dense* layer) {
 }
 //////////////////////////////////////////////////// ACCURACY METHODS ///////////////////////////////////////////////////////////////////////////
 
-double calculate_accuracy(matrix* class_targets, layer_dense* final_layer, ClassLabelEncoding encoding) {
+double calculate_accuracy(matrix* class_targets, layer_dense* final_layer) {
 
     // handles mismatching first dimensions 
     if (class_targets->dim1 != final_layer->post_activation_output->dim1) {
@@ -316,61 +316,31 @@ double calculate_accuracy(matrix* class_targets, layer_dense* final_layer, Class
     int num_samples = final_layer->post_activation_output->dim1;
 
     // handles one hot encoded vectors
-    if (encoding == ONE_HOT) {
-
          // handles mismatching second dimensions 
-        if (class_targets->dim2 != final_layer->post_activation_output->dim2) {
-            fprintf(stderr, "Error: Mismatching dimensions in calculate accuracy, dim2 for class targets and predictions.\n");
-            exit(1);
-        } 
-
-        // iter through every prediction
-        for (int i = 0; i < final_layer->post_activation_output->dim1; i++) {
-
-            // find max value, ie the prediction in each input in the batch
-            int max_indx = -1;
-            double max = -DBL_MAX;
-            for (int j = 0; j < final_layer->post_activation_output->dim2; j++) {
-                if (final_layer->post_activation_output->data[i * final_layer->post_activation_output->dim2 + j] > max) {
-                    max = final_layer->post_activation_output->data[i * final_layer->post_activation_output->dim2 + j];
-                    max_indx = j;
-                }
-            }
-
-            // incriment correct count if the predictions match the one hot encoded vector
-            if (class_targets->data[i * class_targets->dim2 + max_indx] == 1) {
-                correct_count += 1;
-            }
-        }    
-    }
-    
-    // handles sparse true label vectors
-    else if (encoding == SPARSE) {
-
-        // iter through every prediction
-        for (int i = 0; i < final_layer->post_activation_output->dim1; i++) {
-            int max_indx = -1;
-            double max = -DBL_MAX;
-            for (int j = 0; j < final_layer->post_activation_output->dim2; j++) {
-                if (final_layer->post_activation_output->data[i * final_layer->post_activation_output->dim2 + j] > max) {
-                    max = final_layer->post_activation_output->data[i * final_layer->post_activation_output->dim2 + j];
-                    max_indx = j;
-                }
-            }
-
-            // incriment correct count if the predictions match the sparse vector
-            if (class_targets->data[i] == max_indx) {
-                correct_count+=1;
-            }
-        }    
-    }
-
-    // handles encoding type input error
-    else {
-        fprintf(stderr, "Error: Incorrect encoding type provided.\n");
+    if (class_targets->dim2 != final_layer->post_activation_output->dim2) {
+        fprintf(stderr, "Error: Mismatching dimensions in calculate accuracy, dim2 for class targets and predictions.\n");
         exit(1);
-    }
+    } 
 
+    // iter through every prediction
+    for (int i = 0; i < final_layer->post_activation_output->dim1; i++) {
+
+        // find max value, ie the prediction in each input in the batch
+        int max_indx = -1;
+        double max = -DBL_MAX;
+        for (int j = 0; j < final_layer->post_activation_output->dim2; j++) {
+            if (final_layer->post_activation_output->data[i * final_layer->post_activation_output->dim2 + j] > max) {
+                max = final_layer->post_activation_output->data[i * final_layer->post_activation_output->dim2 + j];
+                max_indx = j;
+            }
+        }
+
+        // incriment correct count if the predictions match the one hot encoded vector
+        if (class_targets->data[i * class_targets->dim2 + max_indx] == 1) {
+            correct_count += 1;
+        }
+    }    
+    
     // calculate and return accuracy
     double accuracy = (1.0)*correct_count / num_samples;
 
@@ -379,7 +349,7 @@ double calculate_accuracy(matrix* class_targets, layer_dense* final_layer, Class
 
 //////////////////////////////////////////////////// LOSS METHODS ///////////////////////////////////////////////////////////////////////////
 
-matrix* loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer, ClassLabelEncoding encoding) {
+double loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer) {
 
     // check if predictions and true values dim1 match in size
     if(last_layer->post_activation_output->dim1 != true_pred->dim1) {
@@ -388,90 +358,51 @@ matrix* loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_laye
     }
 
     // initialize losses data.
-    matrix* losses = allocate_matrix(last_layer->post_activation_output->dim1, 1);
+    double losses = 0.0;
 
-    // one hot encoded assumption
-    if(encoding == ONE_HOT) {
-        
-        // check if one hot is the correct size
-        if (last_layer->post_activation_output->dim2 != true_pred->dim2) {
-            fprintf(stderr, "Error: Dimension 2 for one hot vectors and predictions do not match.\n");
-            exit(1);
-        }
-
-        // iterate over every vector in the prediction batch
-        for (int i = 0; i < last_layer->post_activation_output->dim1; i++) {
-
-            // find true class in one hot vector
-            int true_class = -1;
-            for (int j = 0; j < true_pred->dim2; j++) {
-                if (true_pred->data[i * true_pred->dim2 + j] == 1.0) {
-                    true_class = j;
-                    break;
-                }
-            }
-
-            // error handling if no true class is found
-            if(true_class == -1) {
-                fprintf(stderr, "Error: No true class found in one hot vectors. \n");
-                exit(1);
-            }
-
-            // get predicted sample in question with relation to true class
-            double predicted_sample = last_layer->post_activation_output->data[i * last_layer->post_activation_output->dim2 + true_class];
-
-            // clip value so we never calculate log(0)
-            if(predicted_sample < 1e-15) {
-                predicted_sample = 1e-15;
-            }
-            
-            // calcuale -log loss for the sample in question and append to loss matrix
-            double loss = -log(predicted_sample);
-            losses->data[i] = loss;
-        }
-    }
-
-    // sparse encoded assumption
-    else if (encoding == SPARSE) {
-
-        // iterate through every true classification in the sparse vector
-        for (int i = 0; i < true_pred->dim1; i++) {
-
-            // get true class value from 1d sparse vector.
-            int true_class = (int)true_pred->data[i];
-
-            // Error handling, check if true class is in bounds of prediction vectors
-            if (true_class < 0 || true_class >= last_layer->post_activation_output->dim2) {
-                fprintf(stderr,"Error: True class dimensions out of bounds. \n");
-                exit(1);
-            }  
-
-            // get predicted sample from batch data 
-            double predicted_sample = last_layer->post_activation_output->data[i * last_layer->post_activation_output->dim2 + true_class];
-            
-            // clip value so we never calculate log(0)
-            if (predicted_sample < 1e-15) {
-                predicted_sample = 1e-15;
-            }
-
-            // calcuale -log loss for the sample in question and append to loss matrix
-            double loss = -log(predicted_sample);
-            
-            losses->data[i] = loss;
-        }
-    }
-
-    // error handling
-    else {
-        fprintf(stderr, "Error: Incorrect type encoding provided. \n");
+    // check if one hot is the correct size
+    if (last_layer->post_activation_output->dim2 != true_pred->dim2) {
+        fprintf(stderr, "Error: Dimension 2 for one hot vectors and predictions do not match.\n");
         exit(1);
     }
 
+    // iterate over every vector in the prediction batch
+    for (int i = 0; i < last_layer->post_activation_output->dim1; i++) {
+
+        // find true class in one hot vector
+        int true_class = -1;
+        for (int j = 0; j < true_pred->dim2; j++) {
+            if (true_pred->data[i * true_pred->dim2 + j] == 1.0) {
+                true_class = j;
+                break;
+            }
+        }
+
+        // error handling if no true class is found
+        if(true_class == -1) {
+            fprintf(stderr, "Error: No true class found in one hot vectors. \n");
+            exit(1);
+        }
+
+        // get predicted sample in question with relation to true class
+        double predicted_sample = last_layer->post_activation_output->data[i * last_layer->post_activation_output->dim2 + true_class];
+
+        // clip value so we never calculate log(0)
+        if(predicted_sample < 1e-15) {
+            predicted_sample = 1e-15;
+        }
+        
+        // calcuale -log loss for the sample in question and append to loss matrix
+        double loss = -log(predicted_sample);
+        losses += loss;
+    }
+
+
     // return losses
-    return(losses);
+    return(losses / true_pred->dim1);
 }
 
-matrix* loss_binary_cross_entropy(layer_dense* layer, matrix* Y) {
+double loss_binary_cross_entropy(layer_dense* layer, matrix* Y) {
     // Check for dimension compatibility
     if (layer->post_activation_output->dim1 != Y->dim1 || Y->dim2 != 1) {
         fprintf(stderr, "Error: Mismatch between prediction and true label dimensions.\n");
@@ -479,15 +410,7 @@ matrix* loss_binary_cross_entropy(layer_dense* layer, matrix* Y) {
     }
 
     // Initialize loss matrix
-    matrix* losses = malloc(sizeof(matrix));
-    losses->dim1 = Y->dim1;
-    losses->dim2 = 1;
-    losses->data = (double*) calloc(Y->dim1, sizeof(double));
-
-    if (losses->data == NULL) {
-        fprintf(stderr, "Error: Memory allocation failed for losses.\n");
-        exit(1);
-    }
+    double losses = 0.0;
 
     // Iterate over each sample
     for (int i = 0; i < Y->dim1; i++) {
@@ -505,10 +428,10 @@ matrix* loss_binary_cross_entropy(layer_dense* layer, matrix* Y) {
         );
 
         // Store loss
-        losses->data[i] = loss;
+        losses += loss;
     }
 
-    return losses;
+    return (losses / Y->dim1);
 }
 
 double calculate_regularization_loss(layer_dense* layer) {
@@ -1386,11 +1309,10 @@ void apply_dropout_gradients(matrix* input_gradients, layer_dense* layer) {
 
 ////////////////////////////////////////////////// OPTIMIZER METHODS ///////////////////////////////////////////////////////////////////////////
 
+
 void update_params_sgd(layer_dense* layer, double* learning_rate, int current_epoch, double decay_rate) {
 
     // Decay the learning rate after each epoch
-    *learning_rate = fmax(*learning_rate * exp(-decay_rate * current_epoch), 0.000001);
-
 #ifdef ENABLE_PARALLEL // Parallel Approach
 
     // Update weights
@@ -1429,9 +1351,6 @@ void update_params_sgd(layer_dense* layer, double* learning_rate, int current_ep
 
 void update_params_sgd_momentum(layer_dense* layer, double* learning_rate, int current_epoch, double decay_rate, double beta) {
 
-    // Decay the learning rate after each epoch
-    *learning_rate = fmax(*learning_rate * exp(-decay_rate * current_epoch), 0.001);
-    
 #ifdef ENABLE_PARALLEL // Parallel Approach
 
     // Update weights
@@ -1480,7 +1399,6 @@ void update_params_sgd_momentum(layer_dense* layer, double* learning_rate, int c
 }
 
 void update_params_adagrad(layer_dense* layer, double* learning_rate, int current_epoch, double decay_rate, double epsilon) {
-
 #ifdef ENABLE_PARALLEL // Parallel Approach
     // WEIGHTS
     // Square every element in dweights, add to cache_weights
@@ -1526,8 +1444,7 @@ void update_params_adagrad(layer_dense* layer, double* learning_rate, int curren
 #endif
 }
 
-void update_params_rmsprop(layer_dense* layer, double* learning_rate, double decay_rate, double epsilon) {
-
+void update_params_rmsprop(layer_dense* layer, int current_epoch, double* learning_rate, double decay_rate, double epsilon) {
 #ifdef ENABLE_PARALLEL // Parallel Approach
     // WEIGHTS
     #pragma omp for schedule(static) 
@@ -1576,17 +1493,13 @@ void update_params_rmsprop(layer_dense* layer, double* learning_rate, double dec
 }
 
 void update_params_adam (layer_dense* layer, double* learning_rate, double decay_rate, double beta_1, 
-                double beta_2, double epsilon, int current_epoch, int total_epochs, bool correctBias) {
+                double beta_2, double epsilon, int current_epoch, int total_epochs, bool correctBias, bool weight_decay) {
 
     // Apply learning rate decay (if decay factor is specified)
-    if (decay_rate > 0.0) {
-        *learning_rate = fmax(*learning_rate * (1 / (1 + decay_rate * current_epoch)), 1e-6);
-    }
-
 #ifdef ENABLE_PARALLEL // Parallel Approach
 
     // Weights
-    #pragma omp for schedule(static)
+    #pragma omp for schedule(dynamic)
     for (int i = 0; i < layer->dweights->dim1 * layer->dweights->dim2; i++) {
 
         // Update Momentum
@@ -1594,16 +1507,16 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
         
         // Correct Momentum
         if (correctBias) {
-            long double beta_1_pow = pow(beta_1, current_epoch+1);
+            long double beta_1_pow = pow(beta_1, current_epoch + 1);
             layer->w_velocity->data[i] = layer->w_velocity->data[i] / (1.0 - beta_1_pow); // Bias correction for weights momentum
         }
 
         // Update cache 
-        layer->cache_weights->data[i] = beta_2 * layer->cache_weights->data[i] + (1.0 - beta_2) * layer->dweights->data[i] * layer->dweights->data[i];
+        layer->cache_weights->data[i] = beta_2 * layer->cache_weights->data[i] + (1.0 - beta_2) * (layer->dweights->data[i] * layer->dweights->data[i]);
         
         // Correct cache
         if (correctBias) {
-            long double beta_2_pow = pow(beta_2, current_epoch+1);
+            long double beta_2_pow = pow(beta_2, current_epoch + 1);
             layer->cache_weights->data[i] = layer->cache_weights->data[i] / (1.0 - beta_2_pow); // Bias correction for weight cache
         }
 
@@ -1613,7 +1526,7 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
     
 
     // Biases
-    #pragma omp for schedule(static)
+    #pragma omp for schedule(dynamic)
     for (int i = 0; i < layer->dbiases->dim1 * layer->dbiases->dim2; i++) {
         // Update Momentum
         layer->b_velocity->data[i] = beta_1 * layer->b_velocity->data[i] + (1.0 - beta_1) * layer->dbiases->data[i];
@@ -1633,7 +1546,7 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
             layer->cache_bias->data[i] = layer->cache_bias->data[i] / (1.0 - beta_2_pow); // Bias correction for bias cache
         }
 
-        // Update Bias using corrected moments and cache
+        // Update Weights using corrected moments and cache
         layer->biases->data[i] -= (*learning_rate) * layer->b_velocity->data[i] / (sqrt(layer->cache_bias->data[i]) + epsilon);
     }
 
@@ -1651,7 +1564,7 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
         }
 
         // Update cache 
-        layer->cache_weights->data[i] = beta_2 * layer->cache_weights->data[i] + (1.0 - beta_2) * layer->dweights->data[i] * layer->dweights->data[i];
+        layer->cache_weights->data[i] = beta_2 * layer->cache_weights->data[i] + (1.0 - beta_2) * (layer->dweights->data[i] * layer->dweights->data[i]);
         
         // Correct cache
         if (correctBias) {
@@ -1692,8 +1605,8 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
 }
 
 void optimization_dense(layer_dense* layer, double* lr, double lr_decay, int current_epoch, int total_epochs, double beta1, double beta2,
-                        double epsilon, bool useBiasCorrection) {
-
+                        double epsilon, bool useBiasCorrection, bool useWeightDecay) {
+    // Apply optimizers
     if (layer->optimization == SGD){
         update_params_sgd(layer, lr, current_epoch, lr_decay);
     }
@@ -1706,11 +1619,12 @@ void optimization_dense(layer_dense* layer, double* lr, double lr_decay, int cur
     }
 
     else if(layer->optimization == RMS_PROP) {
-        update_params_rmsprop(layer, lr, lr_decay, epsilon);
+        update_params_rmsprop(layer, current_epoch, lr, lr_decay, epsilon);
     }
 
     else if (layer->optimization == ADAM) {
-        update_params_adam(layer, lr, lr_decay, beta1, beta2, epsilon, current_epoch, total_epochs, useBiasCorrection);
+        update_params_adam(layer, lr, lr_decay, beta1, beta2, epsilon, current_epoch, total_epochs, 
+                        useBiasCorrection, useWeightDecay);
     }
 
 }

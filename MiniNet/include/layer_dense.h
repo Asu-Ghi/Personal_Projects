@@ -81,19 +81,19 @@ void free_memory(layer_dense* layer);
 /*
 Calculates the accuracy of the network while training.
 */
-double calculate_accuracy(matrix* class_targets, layer_dense* final_layer, ClassLabelEncoding encoding);
+double calculate_accuracy(matrix* class_targets, layer_dense* final_layer);
 
 //////////////////////////////////////////////////// LOSS METHODS ///////////////////////////////////////////////////////////////////////////
 
 /*
 Calculates the categorical cross entropy loss of the network while training.
 */
-matrix* loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer, ClassLabelEncoding encoding);
+double loss_categorical_cross_entropy(matrix* true_pred, layer_dense* last_layer);
 
 /*
 Calculates loss for binary cross entropy.
 */
-matrix* loss_binary_cross_entropy(layer_dense* layer, matrix* Y);
+double loss_binary_cross_entropy(layer_dense* layer, matrix* Y);
 
 /*
 Calculates regularization loss l1 and l2 for a given layer.
@@ -207,7 +207,7 @@ void update_params_adagrad(layer_dense* layer, double* learning_rate, int curren
 /*
 RMSPROP Optimization
 */
-void update_params_rmsprop(layer_dense* layer, double* learning_rate, double decay_rate, double epsilon);
+void update_params_rmsprop(layer_dense* layer, int current_epoch, double* learning_rate, double decay_rate, double epsilon);
 
 /*
 Adam Optimization
@@ -217,11 +217,11 @@ For Mini Batch Gradient Descent t is incriminted after every mini batch.
 Beta_1 and Beta_2 are hyperparameters affecting momentum and RMSProp caches respectively. 
 */
 void update_params_adam (layer_dense* layer, double* learning_rate, double decay_rate, double beta_1, 
-                double beta_2, double epsilon, int current_epoch, int total_epochs, bool correctBias);
+                double beta_2, double epsilon, int current_epoch, int total_epochs, bool correctBias, bool weight_decay);
 
 
 /*
 Call optimization for dense
 */
 void optimization_dense(layer_dense* layer, double* lr, double lr_decay, int current_epoch, int total_epochs, double beta1, double beta2,
-                        double epsilon, bool useBiasCorrection);
+                        double epsilon, bool useBiasCorrection, bool useWeightDecay);

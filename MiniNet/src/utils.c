@@ -195,7 +195,7 @@ void load_mnist_data(char* filename, double* X, double* Y, int num_samples) {
         // Read the image data
         int pixel_idx = 0;
         while ((token = strtok(NULL, ",")) != NULL && pixel_idx < image_size) {
-            X[sample_index * image_size + pixel_idx] = atof(token);
+            X[sample_index * image_size + pixel_idx] = atof(token) / 255.0;
             pixel_idx++;
         }
 
@@ -252,6 +252,13 @@ void free_matrix(matrix* M) {
         fprintf(stderr, "Error: Freeing memory failed in free matrix.\n");
     }   
 }
+
+void shallow_cpy_matrix(matrix* src, matrix* dest, int start_row, int num_rows) {
+    dest->dim1 = num_rows;
+    dest->dim2 = src->dim2;
+    dest->data = src->data + start_row * dest->dim2; // Point to the starting row
+}
+
 //////////////////////////////////////////////////// SEQ/OMP LIN ALG METHODS //////////////////////////////////////////////////////////////
 
 matrix* transpose_matrix(matrix* w){

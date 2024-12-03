@@ -8,14 +8,16 @@ output: html_document
 - Open MP support
 - Visualization matplotlib toolkit in python
 
-### Figure 1: Mnist Training Demonstration
+### Figure 1: Mnist Training Demonstration with 2 layers
+![Mnist Demonstration_2](results/demonstrations/mnist_2_layer_dem.png)
 
-![Mnist Demonstration](results/demonstrations/mnist_2_layer_dem.png)
+### Figure 2: Mnist Training Demonstration with 3 layers
+![Mnist Demonstration_3](results/demonstrations/mnist_3_layer_dem.png)
 
-### Figure 2: Spiral Strong Scaling Study
+### Figure 3: Spiral Strong Scaling Study
 ![Strong Scaling, Small NN](results/demonstrations/strong_scaling_plot_2.png)
 
-### Figure 3: Mnist Strong Scaling Study
+### Figure 4: Mnist Strong Scaling Study
 ![Strong Scaling, Larger NN](results/demonstrations/strong_scaling_plot_Mnist1.png)
 
 ## Planned Work
