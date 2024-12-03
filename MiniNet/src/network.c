@@ -442,9 +442,6 @@ void train_mini_batch(NeuralNetwork* network, int num_epochs, int batch_size, Tr
         #ifdef ENABLE_SOCKET
         send_data(network, sockfd);   
         #endif
-
-        // Free uneeded memory in network after pass   
-        free_layers_memory(network);
     }
 
     #ifdef ENABLE_SOCKET

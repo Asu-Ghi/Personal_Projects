@@ -14,8 +14,3 @@ void test_spiral();
 Test network on iris data
 */
 void test_iris();
-
-/*
-Tests strong scaling study for omp application
-*/
-void test_strong_scaling();

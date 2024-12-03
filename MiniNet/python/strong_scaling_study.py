@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Adjust array depending on bash output for strong scaling study
-A = np.array (( (1,771.9773), (2,414.4733), (4,269.1386), (8,205.1848) ))
+A = np.array (( (1,78.1555), (2,41.6198), (4,22.3282), (8,18.5391) ))
 slow_time = A[0,1]
 A[:,1] = slow_time/A[:,1]
 plt.rcParams['figure.figsize'] = (7, 7)
@@ -15,6 +15,6 @@ plt.xlabel ('Log$_2$ Cores')
 plt.ylabel ('Log$_2$ Speedup')
 plt.legend()
 
-save_path = '../results/demonstrations/strong_scaling_plot_Mnist1.png' 
+save_path = '../results/demonstrations/strong_scaling_plot_Mnist_minibatch.png' 
 plt.savefig(save_path, format='png') 
 print(f"Plot saved to {save_path}")

@@ -31,7 +31,7 @@ matrix mnist_X, mnist_Y, mnist_pred_X, mnist_pred_Y;
     OptimizationType optimizations_mnist[4] = {ADAM, ADAM, ADAM, ADAM};
     bool regularizations_mnist[4] = {true, true, true, true};
     double mnist_lr = 0.05;
-    int mnist_num_epochs = 500;
+    int mnist_num_epochs = 200;
     double decay_rate = 5e-5;
     int max_lr = 1;
     double lr_factor = 1.01;
@@ -73,14 +73,14 @@ matrix mnist_X, mnist_Y, mnist_pred_X, mnist_pred_Y;
 
     char* dir_path = "results/params/Mnist";
     mnist_network->send_ratio = 1; // send socket data every n epochs
-    train_full_batch(mnist_network, mnist_num_epochs, &training_data);
-    // train_mini_batch(mnist_network, mnist_num_epochs, 1000, &training_data);
+    // train_full_batch(mnist_network, mnist_num_epochs, &training_data);
+    train_mini_batch(mnist_network, mnist_num_epochs, 1000, &training_data);
 
     free_neural_network(mnist_network);
-    free_matrix(&mnist_X);
-    free_matrix(&mnist_Y);
-    free_matrix(&mnist_pred_X);
-    free_matrix(&mnist_pred_Y);
+    free(mnist_X.data);
+    free(mnist_Y.data);
+    free(mnist_pred_X.data);
+    free(mnist_pred_Y.data);
 
 }
 
@@ -154,75 +154,5 @@ void test_spiral() {
 }
 
 void test_iris() {
-
-}
-
-void test_strong_scaling() {
-
-    // Init Matrix Memory
-    matrix spiral_train, spiral_pred, spiral_test, spiral_test_pred;
-    spiral_train.dim1 = 10000;
-    spiral_train.dim2 = 2;
-    spiral_train.data = (double*) calloc(spiral_train.dim1 * spiral_train.dim2, sizeof(double));
-
-    spiral_pred.dim1 = 10000;
-    spiral_pred.dim2 = 3;
-    spiral_pred.data = (double*) calloc(spiral_pred.dim1 * spiral_pred.dim2, sizeof(double));
-
-    // Init validating
-    spiral_test.dim1 = 1000;
-    spiral_test.dim2 = 2;
-    spiral_test.data = (double*) calloc(spiral_test.dim1 * spiral_test.dim2, sizeof(double));
-
-    spiral_test_pred.dim1 = 1000;
-    spiral_test_pred.dim2 = 3;
-    spiral_test_pred.data = (double*) calloc(spiral_test_pred.dim1 * spiral_test_pred.dim2, sizeof(double));
-
-    // Training
-    load_spiral_data("data/Spiral/test_data_10000.csv", spiral_train.data, 0, 10000, 2);
-    load_spiral_data("data/Spiral/test_labels_10000.csv", spiral_pred.data, 0, 10000, 3);   
-
-    // Validation
-    load_spiral_data("data/Spiral/train_data_1000.csv", spiral_test.data, 0, 1000, 2);
-    load_spiral_data("data/Spiral/train_labels_1000.csv", spiral_test_pred.data, 0, 1000, 3);
-
-    Training_Data training_data = {&spiral_train, &spiral_pred, &spiral_test, &spiral_test_pred};
-
-    int spiral_num_features = 2;
-    int spiral_neurons_in_layer[2] = {512, 3}; // Num neurons in a layer
-    ActivationType spiral_activations_per_layer[2] = {RELU, SOFTMAX}; // size num layers
-    OptimizationType spiral_optimizations_per_layer[2] = {ADAM,  ADAM}; // size num layers
-    bool spiral_regularization_per_layer[2] = {true, true}; // size num layers
-    int num_epochs = 100;
-    double init_lr = 0.05;
-    double decay_rate = 5e-7;
-    int max_lr = 1;
-    double lr_factor = 1.01;
-    double epsilon = 1e-7;
-    double beta_1 = 0.9; // Momentums
-    double beta_2 = 0.925; // RMS PROP CACHE
-    double lambda1 = 1e-5;
-    double lambda2 = 5e-4;
-    
-    NeuralNetwork* network_spiral = init_neural_network(2, spiral_neurons_in_layer, init_lr,
-                                        spiral_activations_per_layer, spiral_optimizations_per_layer, spiral_regularization_per_layer, spiral_num_features);
-    network_spiral->layers[0]->lambda_l1 = lambda1;
-    network_spiral->layers[0]->lambda_l2 = lambda2;
-
-    network_spiral->layers[1]->lambda_l1 = lambda1;
-    network_spiral->layers[1]->lambda_l2 = lambda2;
-
-    network_spiral->layers[0]->drop_out_rate = 0.1;
-
-    network_spiral->beta_1 = beta_1;
-    network_spiral->beta_2 = beta_2;
-    network_spiral->epsilon = epsilon;
-    network_spiral->decay_rate = decay_rate;
-    network_spiral->debug = false;
-    network_spiral->useBiasCorrection = true;
-    network_spiral->early_stopping = false;
-
-    train_full_batch(network_spiral, num_epochs, &training_data);
-
 
 }

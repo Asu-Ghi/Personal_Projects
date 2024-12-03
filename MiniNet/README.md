@@ -5,20 +5,11 @@ date: "2024-11"
 output: html_document
 ---
 ## Current Work  
-- Open MP support
-- Visualization matplotlib toolkit in python
-
-### Figure 1: Mnist Training Demonstration with 2 layers
-![Mnist Demonstration_2](results/demonstrations/mnist_2_layer_dem.png)
-
-### Figure 2: Mnist Training Demonstration with 3 layers
-![Mnist Demonstration_3](results/demonstrations/mnist_3_layer_dem.png)
-
-### Figure 3: Spiral Strong Scaling Study
-![Strong Scaling, Small NN](results/demonstrations/strong_scaling_plot_2.png)
-
-### Figure 4: Mnist Strong Scaling Study
-![Strong Scaling, Larger NN](results/demonstrations/strong_scaling_plot_Mnist1.png)
+- Starting Cuda Support
+- Starting CNN Support
+- Completing Mini Batch Support
+- Completing Open MP support
+- Developing Visualization matplotlib toolkit in python
 
 ## Planned Work
 - Support for CNN and RNN layers
@@ -27,4 +18,24 @@ output: html_document
 ## Problems
 - Too 'javanic', cool down on the oop format.
 - Doesnt make best use of cpu buffer and cache
-- Not as efficient as id like, *see strong scaling studies*, Note that the larger the matrix math requirments are the better the parallelization scales with cpu cores.
+- Not as efficient as id like, *see strong scaling studies*
+
+## Results
+
+### Figure 1: Mnist Training Demonstration with 3 layers (Full Batch)
+- Full batch training results in longer training times and greater number of epochs required to reach satisfactory validation accuracy.
+![Mnist Demonstration 3 Layers](results/demonstrations/mnist_3_layer_dem.png)
+
+### Figure 2: Mnist Strong Scaling Study (Full Batch)
+- Underperforms on full batch training, parallelization not fully utilized. 
+![Strong Scaling, Mnist Full Batch](results/demonstrations/strong_scaling_plot_Mnist1.png)
+
+### Figure 3: Mnist Training Demonstration with 4 layers (Mini Batch)
+- Performs noticeably faster than 3 layered full batch training, achieves target accuracy within 15 epochs. Full batch size of 10k, with mini batches of size 1k samples. 
+![Mnist Demonstration 4 Layers](results/demonstrations/mnist_4_layer_minibatch_dem.png)
+
+### Figure 4: Mnist Strong Scaling Study (Mini Batch)
+- Parallelization performs slightly better on mini batch training, the lack of performance on 8 cores might be due to
+the limiting nature of omp not allowing me to fully utilize all 8 cores on my current machine.
+![Strong Scaling, MNIST Mini Batch](results/demonstrations/strong_scaling_plot_Mnist_minibatch.png)
+
