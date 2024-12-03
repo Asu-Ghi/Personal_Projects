@@ -4,7 +4,6 @@ author: "Asu Ghimire"
 date: "2024-11"
 output: html_document
 ---
-
 ## Current Work  
 - Open MP support
 - Visualization matplotlib toolkit in python
