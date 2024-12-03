@@ -1,7 +1,7 @@
 {
-	"learning_rate":	0.00023638997549905614,
-	"current_epoch":	1000,
-	"beta1":	0.9,
+	"learning_rate":	0.00038960323172024952,
+	"current_epoch":	500,
+	"beta1":	0.85,
 	"beta2":	0.925,
 	"epsilon":	1e-07,
 	"l2_lambda":	0.005

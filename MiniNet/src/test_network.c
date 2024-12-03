@@ -29,7 +29,7 @@ matrix mnist_X, mnist_Y, mnist_pred_X, mnist_pred_Y;
     OptimizationType optimizations_mnist[4] = {ADAM, ADAM, ADAM, ADAM};
     bool regularizations_mnist[4] = {true, true, true, true};
     double mnist_lr = 0.0005;
-    int mnist_num_epochs = 2000;
+    int mnist_num_epochs = 500;
     double decay_rate = 5e-7;
     int max_lr = 1;
     double lr_factor = 1.01;
@@ -46,7 +46,7 @@ matrix mnist_X, mnist_Y, mnist_pred_X, mnist_pred_Y;
     mnist_network->beta_2 = beta_2;
     mnist_network->epsilon = epsilon;
     mnist_network->decay_rate = decay_rate;
-    mnist_network->debug = true;
+    mnist_network->debug = false;
     mnist_network->useBiasCorrection = true;
     mnist_network->decay_rate = decay_rate;
     
@@ -69,7 +69,7 @@ matrix mnist_X, mnist_Y, mnist_pred_X, mnist_pred_Y;
 
     char* dir_path = "results/params/Mnist";
     mnist_network->send_ratio = 1; // send socket data every n epochs
-    print_nn_info(mnist_network); // print network info
+    // print_nn_info(mnist_network); // print network info
     train_nn(mnist_network, mnist_num_epochs, &mnist_X, &mnist_Y, &mnist_pred_X, &mnist_pred_Y);
     export_params(mnist_network, dir_path);
 }
@@ -178,7 +178,7 @@ void test_strong_scaling() {
     ActivationType spiral_activations_per_layer[2] = {RELU, SOFTMAX}; // size num layers
     OptimizationType spiral_optimizations_per_layer[2] = {ADAM,  ADAM}; // size num layers
     bool spiral_regularization_per_layer[2] = {true, true}; // size num layers
-    int num_epochs = 500;
+    int num_epochs = 100;
     double init_lr = 0.05;
     double decay_rate = 5e-7;
     int max_lr = 1;

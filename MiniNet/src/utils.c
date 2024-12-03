@@ -335,31 +335,26 @@ matrix* matrix_mult(matrix* w, matrix* v) {
         exit(1);
     }
 
-#ifdef ENABLE_PARALLEL 
-    // Perform the matrix multiplication
-    #pragma omp parallel 
-    {   
-        int thread_id = omp_get_thread_num(); // Get current thread id
-        int total_threads = omp_get_num_threads(); // Get total num threads
-        int rows_per_thread = (rows_w + total_threads - 1) / total_threads; // Get num rows to calc per each thread
-        int start_row = rows_per_thread * thread_id; // Get start row for unique thread
-        int end_row = rows_per_thread * thread_id + rows_per_thread; // Get end row for unique thread
-
-        // Check to see if in bounds of thread calculations
-        if (end_row > rows_w) {
-            end_row = rows_w;
-        }
-
-        // Calculate matrix mult for each row
-        for (int i = start_row; i < end_row; i++) {
-            for (int j = 0; j < cols_v; j++) {
-                for (int k = 0; k < cols_w; k++) {
-                    result->data[i * cols_v + j] += w->data[i * cols_w + k] * v->data[k * cols_v + j];
+#ifdef ENABLE_PARALLEL
+    int block_size = 32;
+    #pragma omp parallel for collapse(2) schedule(dynamic)
+    for (int i = 0; i < rows_w; i += block_size) {
+        for (int j = 0; j < cols_v; j += block_size) {
+            // Tile multiplication
+            for (int k = 0; k < cols_w; k += block_size) {
+                // Iterate over blocks of w, v, and result
+                for (int ii = i; ii < i + block_size && ii < rows_w; ++ii) {
+                    for (int jj = j; jj < j + block_size && jj < cols_v; ++jj) {
+                        double sum = 0.0;
+                        for (int kk = k; kk < k + block_size && kk < cols_w; ++kk) {
+                            sum += w->data[ii * cols_w + kk] * v->data[kk * cols_v + jj];
+                        }
+                        result->data[ii * cols_v + jj] += sum;
+                    }
                 }
             }
         }
     }
-
 #else 
         for (int i = 0; i < rows_w; i++) {
             for (int j = 0; j < cols_v; j++) {
@@ -619,9 +614,6 @@ matrix* matrix_scalar_sum(matrix* w, double s, bool useAbs) {
 
     return result; // return pointer to matrix
 }
-
-
-
 
 
 

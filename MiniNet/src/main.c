@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
     #ifdef STUDY_TIMING
     double start_time = omp_get_wtime();
     #endif
-    test_strong_scaling();
+    test_mnist();
     #ifdef STUDY_TIMING
     double end_time = omp_get_wtime();
     printf ("(%d,%.4f),\n",NUM_THREADS,end_time - start_time);
