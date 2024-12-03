@@ -11,7 +11,8 @@
         "optional": "cpp",
         "stdexcept": "cpp",
         "typeinfo": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "complex": "c"
     },
     "C_Cpp.default.compilerPath": "/opt/homebrew/opt/llvm/bin/clang"
 }

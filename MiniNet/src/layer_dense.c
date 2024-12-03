@@ -734,8 +734,8 @@ for(int i = 0; i < outputs->dim1; i++) {
 matrix* forward_sigmoid(matrix* inputs) {
     // Allocate Memory for outputs
     matrix* outputs = allocate_matrix(inputs->dim1, inputs->dim2);
-   int row_outputs = outputs->dim1;
-   int cols_outputs = outputs->dim2;
+    int row_outputs = outputs->dim1;
+    int cols_outputs = outputs->dim2;
 
 #ifdef ENABLE_PARALLEL // Parallel Approach
 #pragma omp parallel 
@@ -1175,7 +1175,7 @@ void calculate_relu_gradients(matrix* relu_gradients, layer_dense* layer) {
     #pragma omp parallel
     {
 
-    #pragma omp for 
+    #pragma omp for schedule(static)
     for (int i = 0; i < layer->pre_activation_output->dim1 * layer->pre_activation_output->dim2; i++) {
         if (layer->pre_activation_output->data[i] >= 0) {
             relu_gradients->data[i] = 1;
@@ -1321,7 +1321,7 @@ void apply_regularization_gradients(layer_dense* layer) {
 #ifdef ENABLE_PARALLEL
 
     // weights
-    #pragma omp for
+    #pragma omp for schedule(static)
     for (int i = 0; i < layer->dweights->dim1 * layer->dweights->dim2; i++) {
         // L2 gradients
         layer->dweights->data[i] += 2 * layer->lambda_l2 * layer->weights->data[i];
@@ -1330,7 +1330,7 @@ void apply_regularization_gradients(layer_dense* layer) {
         layer->dweights->data[i] += layer->lambda_l1 * (layer->weights->data[i] >= 0.0 ? 1.0 : -1.0);
     }
     // biases
-    #pragma omp for
+    #pragma omp for schedule(static)
     for (int i = 0; i < layer->dbiases->dim1 * layer->dbiases->dim2; i++) {
         // L2 gradients
         layer->dbiases->data[i] += 2 * layer->lambda_l2 * (layer->biases->data[i]);
@@ -1594,8 +1594,8 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
         
         // Correct Momentum
         if (correctBias) {
-            long double log_beta_1 = log(beta_1);
-            layer->w_velocity->data[i] = (double) layer->w_velocity->data[i] / (1.0 - exp((current_epoch + 1) * log_beta_1)); // Bias correction for weights momentum
+            long double beta_1_pow = pow(beta_1, current_epoch+1);
+            layer->w_velocity->data[i] = layer->w_velocity->data[i] / (1.0 - beta_1_pow); // Bias correction for weights momentum
         }
 
         // Update cache 
@@ -1603,8 +1603,8 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
         
         // Correct cache
         if (correctBias) {
-            long double log_beta_2 = log(beta_2);
-            layer->cache_weights->data[i] = (double) layer->cache_weights->data[i] / (1.0 - exp((current_epoch + 1) * log_beta_2)); // Bias correction for weight cache
+            long double beta_2_pow = pow(beta_2, current_epoch+1);
+            layer->cache_weights->data[i] = layer->cache_weights->data[i] / (1.0 - beta_2_pow); // Bias correction for weight cache
         }
 
         // Update Weights using corrected moments and cache
@@ -1620,8 +1620,8 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
         
         // Correct Momentum
         if (correctBias) {
-            long double log_beta_1 = log(beta_1);
-            layer->b_velocity->data[i] = (double) layer->b_velocity->data[i] / (1.0 - exp((current_epoch + 1) * log_beta_1)); // Bias correction for bias momentum
+            long double beta_1_pow = pow(beta_1, current_epoch+1);
+            layer->b_velocity->data[i] = layer->b_velocity->data[i] / (1.0 - beta_1_pow); // Bias correction for bias momentum
         }
         
         // Update cache 
@@ -1629,8 +1629,8 @@ void update_params_adam (layer_dense* layer, double* learning_rate, double decay
         
         // Correct cache
         if (correctBias) {
-            long double log_beta_2 = log(beta_2);
-            layer->cache_bias->data[i] = (double) layer->cache_bias->data[i] / (1.0 - exp((current_epoch + 1) * log_beta_2)); // Bias correction for bias cache
+            long double beta_2_pow = pow(beta_2, current_epoch+1);
+            layer->cache_bias->data[i] = layer->cache_bias->data[i] / (1.0 - beta_2_pow); // Bias correction for bias cache
         }
 
         // Update Bias using corrected moments and cache

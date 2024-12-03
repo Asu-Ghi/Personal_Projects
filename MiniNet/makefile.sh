@@ -17,8 +17,7 @@ SRC_FILES="src/main.c src/network.c src/layer_dense.c src/utils.c libs/cJSON.c s
 INCLUDE_DIR="include/"
 BUILD_DIR="build/"
 OUTPUT_FILE="${BUILD_DIR}main"
-SHARED_LIB_OUTPUT="${BUILD_DIR}libnn.so"  # Shared library output file
-CFLAGS="-O3 -march=native -funroll-loops -lm -ftree-vectorize -I ${INCLUDE_DIR} -I libs/"
+CFLAGS="-O3 -g -march=native -funroll-loops -fopenmp -lm -ftree-vectorize -I ${INCLUDE_DIR} -I libs/"
 PARALLEL_FLAG=""
 DIAGNOSTIC_FLAG=""
 SOCKET_FLAG=""
@@ -26,30 +25,12 @@ SOCKET_FLAG=""
 # Check for flags
 if has_param "-parallel" "$@"; then
     echo "Compiling with OpenMP parallelization enabled..."
-    PARALLEL_FLAG="-fopenmp -D ENABLE_PARALLEL"
+    PARALLEL_FLAG="-D ENABLE_PARALLEL -D NUM_THREADS=8"
 fi
 
 if has_param "-diag" "$@"; then
     echo "Compiling with debugging diagnostics flag enabled..."
-    DIAGNOSTIC_FLAG="-fsanitize=address,undefined -g"
-fi
-
-if has_param "-shared" "$@"; then
-    echo "Compiling into shared library..."
-
-    # Modify the compile command to create a shared library instead of an executable
-    OUTPUT_FILE="$SHARED_LIB_OUTPUT"  # Change the output to the shared library
-
-    # Compile the shared library (using gcc/clang with -shared and -fPIC)
-    echo "Compiling as shared library..."
-    clang $CFLAGS $PARALLEL_FLAG $DIAGNOSTIC_FLAG -fPIC -shared $SRC_FILES -o $OUTPUT_FILE
-    if [[ $? -ne 0 ]]; then
-        echo "Compilation of shared library failed. Exiting."
-        exit 1
-    fi
-
-    echo "Shared library compiled successfully: $OUTPUT_FILE"
-    exit 0
+    DIAGNOSTIC_FLAG="-fsanitize=address,undefined"
 fi
 
 # Run the Python script if the -python flag is set
@@ -84,6 +65,6 @@ echo "Compilation successful. Output file: $OUTPUT_FILE"
 
 # Run the program
 echo "Running the program..."
-time $OUTPUT_FILE
+time $OUTPUT_FILE 
 
 echo "Program finished."
